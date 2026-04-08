@@ -9,9 +9,6 @@
 
         body {
             margin: 0; padding: 0; overflow: hidden;
-            background: #05050f;
-            color: #d4af37;
-            font-family: 'IM Fell English SC', serif;
             height: 100vh;
             display: flex;
             align-items: center;
@@ -21,113 +18,110 @@
 
         .bg {
             position: absolute; inset: 0;
-            background: linear-gradient(rgba(5,5,25,0.9), rgba(20,10,5,0.95)),
-                        url('https://picsum.photos/id/1015/1920/1080') center/cover;
-            filter: brightness(0.52) contrast(1.28) saturate(0.85);
+            background: url('./knightfall-bg.jpg') center/cover no-repeat;
+            filter: brightness(0.92) contrast(1.08) saturate(1.12);
             z-index: -3;
+        }
+
+        .overlay {
+            position: absolute; inset: 0;
+            background: linear-gradient(to bottom, rgba(5,5,25,0.65), rgba(20,10,5,0.75));
+            z-index: -2;
         }
 
         .lightning {
             position: absolute; inset: 0;
-            background: rgba(255, 240, 180, 0.22);
+            background: rgba(230, 245, 255, 0.4);
             opacity: 0;
             pointer-events: none;
-            z-index: -2;
-            animation: lightningFlash 8s infinite;
+            z-index: -1;
+            animation: lightningFlash 6s infinite;
         }
 
         @keyframes lightningFlash {
-            0%, 82% { opacity: 0; }
-            84% { opacity: 0.4; }
-            86% { opacity: 0; }
-            89% { opacity: 0.25; }
+            0%, 75% { opacity: 0; }
+            77% { opacity: 0.7; }
+            79% { opacity: 0; }
+            82% { opacity: 0.45; }
             100% { opacity: 0; }
         }
 
         .title-container {
             text-align: center;
             z-index: 10;
-            max-width: 940px;
-            padding: 40px 30px;
+            max-width: 980px;
+            padding: 90px 40px 70px;
         }
 
         .main-title {
             font-family: 'UnifrakturCook', cursive;
-            font-size: 7.4rem;
-            color: #e8d5a3;
-            text-shadow: 10px 10px 0 #1a140f, 0 0 50px #ffd700;
-            letter-spacing: 15px;
-            margin: 0 0 8px 0;
+            font-size: 8.4rem;
+            color: #f0d8a0;
+            text-shadow: 0 0 30px #ffd700, 12px 12px 0 #1a140f, -8px -8px 0 #1a140f;
+            letter-spacing: 26px;
+            margin: 0 0 10px 0;
         }
 
         .subtitle {
             font-family: 'Playfair Display', serif;
-            font-size: 2.85rem;
-            color: #c0a070;
-            margin: 0 0 45px 0;
-            letter-spacing: 16px;
-            text-shadow: 4px 4px 0 #000;
+            font-size: 3.6rem;
+            color: #d4b070;
+            text-shadow: 8px 8px 0 #1a140f, 0 0 40px #ffd700;
+            letter-spacing: 28px;
+            margin: 0 0 50px 0;
         }
 
-        .sword-divider {
+        .sword {
             width: 100%;
-            max-width: 840px;
-            height: 14px;
-            background: linear-gradient(to right, transparent, #777, #ddd, #777, transparent);
-            margin: 25px auto 40px;
-            box-shadow: 0 0 25px #ffd700;
+            max-width: 920px;
+            margin: 30px auto 55px;
         }
-
-        .sword-divider::before,
-        .sword-divider::after {
-            content: '⚔️';
-            position: absolute;
-            font-size: 72px;
-            top: -48px;
-            color: #d4af37;
-        }
-        .sword-divider::before { left: -55px; }
-        .sword-divider::after { right: -55px; }
 
         .description {
-            font-size: 1.2rem;
-            color: #b8a080;
-            max-width: 700px;
-            margin: 0 auto 55px;
-            line-height: 1.75;
+            font-size: 1.32rem;
+            color: #c8b090;
+            max-width: 760px;
+            margin: 0 auto 65px;
+            line-height: 1.9;
+            text-shadow: 2px 2px 8px #000;
         }
 
         button {
             font-family: 'IM Fell English SC', serif;
-            font-size: 1.7rem;
-            padding: 22px 110px;
-            background: #d4af37;
+            font-size: 1.9rem;
+            padding: 28px 140px;
+            background: linear-gradient(#e8c050, #ffd700);
             color: #1c1408;
             border: none;
-            border-radius: 6px;
+            border-radius: 8px;
             cursor: pointer;
             text-transform: uppercase;
-            letter-spacing: 6px;
-            box-shadow: 0 14px 0 #8b5a2b;
+            letter-spacing: 10px;
+            box-shadow: 0 18px 0 #8b5a2b;
             transition: all 0.3s;
         }
 
         button:hover {
-            background: #ffd700;
-            transform: translateY(-10px);
-            box-shadow: 0 20px 0 #8b5a2b;
+            transform: translateY(-12px);
+            box-shadow: 0 28px 0 #8b5a2b;
         }
     </style>
 </head>
 <body>
     <div class="bg"></div>
+    <div class="overlay"></div>
     <div class="lightning"></div>
 
     <div class="title-container">
         <h1 class="main-title">KNIGHTFALL</h1>
         <div class="subtitle">ENLIGHTENED</div>
         
-        <div class="sword-divider"></div>
+        <svg class="sword" viewBox="0 0 920 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="100" y="35" width="720" height="30" rx="8" fill="#c8c8c8"/>
+            <polygon points="100,35 25,10 25,80" fill="#b0b0b0"/>
+            <polygon points="820,35 895,10 895,80" fill="#b0b0b0"/>
+            <rect x="55" y="22" width="65" height="56" rx="12" fill="#8b5a2b"/>
+        </svg>
 
         <p class="description">
             A medieval world awaits. Explore vast lands, trade with merchants,<br>
@@ -139,7 +133,7 @@
 
     <script>
         function beginJourney() {
-            alert("🌩️ The storm rages as you ride into the kingdom of Eldrath...\n\nYour adventure begins.");
+            alert("🌩️ The storm calls... Your journey into the kingdom of Eldrath begins.");
         }
     </script>
 </body>
