@@ -3,15 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Knightfall - A Dark Medieval Odyssey</title>
+    <title>Knightfall - Enlightened</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=UnifrakturCook:wght@700&family=Creepster&family=IM+Fell+English+SC&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=UnifrakturCook:wght@700&family=Playfair+Display:wght@700&family=IM+Fell+English+SC&display=swap');
 
         body {
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
-            background: #0a0a0a;
+            margin: 0; padding: 0; overflow: hidden;
+            background: #05050f;
             color: #d4af37;
             font-family: 'IM Fell English SC', serif;
             height: 100vh;
@@ -21,170 +19,136 @@
             position: relative;
         }
 
-        /* Dark medieval background with subtle parchment + stone texture feel */
-        .background {
-            position: absolute;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: linear-gradient(rgba(10,10,10,0.85), rgba(30,20,10,0.9)),
-                        url('https://picsum.photos/id/1015/1920/1080') center/cover; /* replace with your own dark medieval image later */
-            filter: contrast(1.1) brightness(0.7);
+        .bg {
+            position: absolute; inset: 0;
+            background: linear-gradient(rgba(5,5,25,0.9), rgba(20,10,5,0.95)),
+                        url('https://picsum.photos/id/1015/1920/1080') center/cover;
+            filter: brightness(0.52) contrast(1.28) saturate(0.85);
+            z-index: -3;
+        }
+
+        .lightning {
+            position: absolute; inset: 0;
+            background: rgba(255, 240, 180, 0.22);
+            opacity: 0;
+            pointer-events: none;
             z-index: -2;
+            animation: lightningFlash 8s infinite;
         }
 
-        .vignette {
-            position: absolute;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: radial-gradient(circle at center, transparent 40%, rgba(0,0,0,0.9) 100%);
-            z-index: -1;
-            animation: flicker 8s infinite alternate;
+        @keyframes lightningFlash {
+            0%, 82% { opacity: 0; }
+            84% { opacity: 0.4; }
+            86% { opacity: 0; }
+            89% { opacity: 0.25; }
+            100% { opacity: 0; }
         }
-
-        .torch {
-            position: absolute;
-            font-size: 80px;
-            opacity: 0.6;
-            animation: torchFlicker 0.15s infinite alternate;
-            text-shadow: 0 0 40px #ff8800, 0 0 80px #ff4400;
-        }
-        .torch-left { top: 15%; left: 8%; }
-        .torch-right { top: 15%; right: 8%; transform: scaleX(-1); }
 
         .title-container {
             text-align: center;
             z-index: 10;
-            padding: 40px 60px;
-            border: 8px solid #8b4513;
-            background: rgba(20, 10, 5, 0.85);
-            box-shadow: 0 0 60px rgba(139, 69, 19, 0.8),
-                        inset 0 0 40px rgba(212, 175, 55, 0.3);
-            max-width: 820px;
+            max-width: 940px;
+            padding: 40px 30px;
         }
 
-        h1 {
+        .main-title {
             font-family: 'UnifrakturCook', cursive;
-            font-size: 5.5rem;
-            margin: 0 0 10px 0;
-            text-shadow: 
-                4px 4px 0 #000,
-                -4px -4px 0 #000,
-                0 0 30px #d4af37;
-            letter-spacing: 8px;
-            color: #d4af37;
-            line-height: 1;
+            font-size: 7.4rem;
+            color: #e8d5a3;
+            text-shadow: 10px 10px 0 #1a140f, 0 0 50px #ffd700;
+            letter-spacing: 15px;
+            margin: 0 0 8px 0;
         }
 
         .subtitle {
-            font-family: 'Creepster', cursive;
-            font-size: 1.8rem;
-            color: #a52a2a;
-            margin-bottom: 40px;
-            text-shadow: 3px 3px 0 #000;
-            letter-spacing: 4px;
+            font-family: 'Playfair Display', serif;
+            font-size: 2.85rem;
+            color: #c0a070;
+            margin: 0 0 45px 0;
+            letter-spacing: 16px;
+            text-shadow: 4px 4px 0 #000;
         }
 
-        .menu {
-            display: flex;
-            flex-direction: column;
-            gap: 18px;
-            align-items: center;
+        .sword-divider {
+            width: 100%;
+            max-width: 840px;
+            height: 14px;
+            background: linear-gradient(to right, transparent, #777, #ddd, #777, transparent);
+            margin: 25px auto 40px;
+            box-shadow: 0 0 25px #ffd700;
+        }
+
+        .sword-divider::before,
+        .sword-divider::after {
+            content: '⚔️';
+            position: absolute;
+            font-size: 72px;
+            top: -48px;
+            color: #d4af37;
+        }
+        .sword-divider::before { left: -55px; }
+        .sword-divider::after { right: -55px; }
+
+        .description {
+            font-size: 1.2rem;
+            color: #b8a080;
+            max-width: 700px;
+            margin: 0 auto 55px;
+            line-height: 1.75;
         }
 
         button {
             font-family: 'IM Fell English SC', serif;
-            font-size: 1.6rem;
-            padding: 14px 60px;
-            background: #3c2f2f;
-            color: #d4af37;
-            border: 4px solid #8b4513;
+            font-size: 1.7rem;
+            padding: 22px 110px;
+            background: #d4af37;
+            color: #1c1408;
+            border: none;
+            border-radius: 6px;
             cursor: pointer;
-            transition: all 0.3s;
             text-transform: uppercase;
-            letter-spacing: 3px;
-            box-shadow: 0 6px 0 #1a140f;
+            letter-spacing: 6px;
+            box-shadow: 0 14px 0 #8b5a2b;
+            transition: all 0.3s;
         }
 
         button:hover {
-            background: #5c4033;
-            transform: translateY(-4px);
-            box-shadow: 0 10px 0 #1a140f;
-            color: #ffd700;
-        }
-
-        button:active {
-            transform: translateY(4px);
-            box-shadow: 0 2px 0 #1a140f;
-        }
-
-        .footer {
-            position: absolute;
-            bottom: 20px;
-            font-size: 1rem;
-            opacity: 0.7;
-            letter-spacing: 2px;
-        }
-
-        @keyframes flicker {
-            0% { opacity: 0.95; }
-            100% { opacity: 1; }
-        }
-
-        @keyframes torchFlicker {
-            0% { transform: scale(1) rotate(-5deg); }
-            100% { transform: scale(1.05) rotate(5deg); }
+            background: #ffd700;
+            transform: translateY(-10px);
+            box-shadow: 0 20px 0 #8b5a2b;
         }
     </style>
 </head>
 <body>
-    <div class="background"></div>
-    <div class="vignette"></div>
-
-    <!-- Torches -->
-    <div class="torch torch-left">🔥</div>
-    <div class="torch torch-right">🔥</div>
+    <div class="bg"></div>
+    <div class="lightning"></div>
 
     <div class="title-container">
-        <h1>Knightfall</h1>
-        <div class="subtitle">A Rugged Medieval Odyssey</div>
+        <h1 class="main-title">KNIGHTFALL</h1>
+        <div class="subtitle">ENLIGHTENED</div>
         
-        <div class="menu">
-            <button onclick="startAdventure()">Begin Your Quest</button>
-            <button onclick="showLore()">The Fallen Kingdom</button>
-            <button onclick="showOptions()">Options</button>
-        </div>
-    </div>
+        <div class="sword-divider"></div>
 
-    <div class="footer">
-        © 2026 GravitySt • Built by Gravity Studios • Version 0.1 — The Long Night Begins
+        <p class="description">
+            A medieval world awaits. Explore vast lands, trade with merchants,<br>
+            survive the wilds, and forge your legend in a realm of knights and castles.
+        </p>
+
+        <button onclick="beginJourney()">BEGIN YOUR JOURNEY</button>
     </div>
 
     <script>
-        function startAdventure() {
-            alert("🌑 The gates creak open... You step into the ruined kingdom of Eldrath. Your sword feels heavy. The adventure begins.");
-            // TODO: Later load main game scene or transition to canvas/PlayCanvas/Godot export
-            console.log("🚀 Knightfall main game would load here");
+        function beginJourney() {
+            alert("🌩️ Thunder cracks across the sky... You ride forth into the kingdom of Eldrath.\n\nThe Long Night has begun.");
         }
 
-        function showLore() {
-            alert("In the year of the Black Eclipse, the once-mighty Kingdom of Eldrath fell to shadow and betrayal.\n\nYou are the last sworn knight. The crown is shattered. The old gods are silent.\n\nOnly blood and steel remain.");
-        }
-
-        function showOptions() {
-            alert("Options Menu (coming soon)\n\n• Graphics\n• Sound\n• Controls\n• Difficulty: Brutal");
-        }
-
-        // Keyboard support (Enter to start)
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter') {
-                startAdventure();
-            }
-        });
-
-        // Random torch intensity for extra atmosphere
+        // Random extra lightning flash
         setInterval(() => {
-            document.querySelectorAll('.torch').forEach(t => {
-                t.style.opacity = 0.5 + Math.random() * 0.4;
-            });
-        }, 300);
+            const flash = document.querySelector('.lightning');
+            flash.style.animation = 'none';
+            void flash.offsetWidth;
+            flash.style.animation = 'lightningFlash 8s infinite';
+        }, 8000);
     </script>
 </body>
 </html>
