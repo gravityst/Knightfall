@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Knightfall - Enlightened</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=UnifrakturCook:wght@700&family=Playfair+Display:wght@700&family=IM+Fell+English+SC&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Playfair+Display:wght@700&family=IM+Fell+English+SC&display=swap');
 
         body {
             margin: 0; padding: 0; overflow: hidden;
@@ -54,7 +54,7 @@
         }
 
         .main-title {
-            font-family: 'UnifrakturCook', cursive;
+            font-family: 'Cinzel', serif;
             font-size: 8.4rem;
             color: #f0d8a0;
             text-shadow: 0 0 30px #ffd700, 12px 12px 0 #1a140f, -8px -8px 0 #1a140f;
@@ -88,22 +88,45 @@
 
         button {
             font-family: 'IM Fell English SC', serif;
-            font-size: 1.9rem;
-            padding: 28px 140px;
-            background: linear-gradient(#e8c050, #ffd700);
+            font-size: 1.5rem;
+            padding: 16px 60px;
+            background: linear-gradient(145deg, #d4af37, #ffd700, #b8860b);
             color: #1c1408;
-            border: none;
-            border-radius: 8px;
+            border: 3px solid #8b5a2b;
+            border-radius: 12px;
             cursor: pointer;
             text-transform: uppercase;
-            letter-spacing: 10px;
-            box-shadow: 0 18px 0 #8b5a2b;
-            transition: all 0.3s;
+            letter-spacing: 6px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.4), inset 0 2px 4px rgba(255,255,255,0.3);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        button:hover::before {
+            left: 100%;
         }
 
         button:hover {
-            transform: translateY(-12px);
-            box-shadow: 0 28px 0 #8b5a2b;
+            transform: translateY(-4px);
+            box-shadow: 0 12px 24px rgba(0,0,0,0.6), inset 0 2px 4px rgba(255,255,255,0.4);
+            background: linear-gradient(145deg, #ffd700, #ffed4e, #d4af37);
+        }
+
+        button:active {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.5), inset 0 2px 4px rgba(255,255,255,0.2);
         }
     </style>
 </head>
@@ -115,20 +138,14 @@
     <div class="title-container">
         <h1 class="main-title">KNIGHTFALL</h1>
         <div class="subtitle">ENLIGHTENED</div>
-        
-        <svg class="sword" viewBox="0 0 920 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect x="100" y="35" width="720" height="30" rx="8" fill="#c8c8c8"/>
-            <polygon points="100,35 25,10 25,80" fill="#b0b0b0"/>
-            <polygon points="820,35 895,10 895,80" fill="#b0b0b0"/>
-            <rect x="55" y="22" width="65" height="56" rx="12" fill="#8b5a2b"/>
-        </svg>
+       
 
         <p class="description">
             A medieval world awaits. Explore vast lands, trade with merchants,<br>
             survive the wilds, and forge your legend in a realm of knights and castles.
         </p>
 
-        <button onclick="beginJourney()">BEGIN YOUR JOURNEY</button>
+        <button onclick="window.location.href='game.html'">BEGIN YOUR JOURNEY</button>
     </div>
 
     <script>
