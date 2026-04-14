@@ -29,6 +29,7 @@
     <div id="biome">— The Long Night —</div>
     <div id="crosshair">+</div>
     <div id="stamina"><div></div></div>
+    <div id="objstatus" style="position:absolute;top:48px;left:20px;color:#ffa050;background:rgba(0,0,0,0.65);border:1px solid #ffa050;padding:6px 12px;z-index:11;font:13px 'IM Fell English SC',Georgia,serif;letter-spacing:1px;">TREES: loading textured models…</div>
     <div id="doorprompt" style="position:absolute;top:55%;left:50%;transform:translateX(-50%);color:#fff0c8;background:rgba(0,0,0,0.55);border:1px solid #d4af37;padding:8px 16px;font:14px 'IM Fell English SC',Georgia,serif;letter-spacing:1px;z-index:10;display:none;text-shadow:0 0 6px #000;"></div>
 
     <script>
@@ -3141,6 +3142,8 @@
             } catch(e) { console.warn('Failed to load', name, e); }
         }));
         console.log('OBJ trees loaded:', Object.keys(objTreeCache).length);
+        const statusEl = document.getElementById('objstatus');
+        if (statusEl) statusEl.textContent = 'TREES: loaded ' + Object.keys(objTreeCache).length + ' models, swapping…';
     }
 
     // Clone an OBJ tree with materials applied, scaled to match the game world
@@ -3168,7 +3171,7 @@
 
         // Scale to match game world (TREE constant is 2.6, OBJ models are ~1-2m, game trees are ~18-28m)
         // Source OBJ models are ~5.5 units tall; scale so final height roughly matches procedural trees
-        const s = scale * 2.8;
+        const s = scale * 3.6;  // bumped so OBJ trees are clearly visible
         tree.scale.set(s, s * rand(0.85, 1.15), s);
         tree.rotation.y = Math.random() * Math.PI * 2;
         return tree;
@@ -3346,7 +3349,22 @@
             replaced++;
         }
         console.log('Replaced', replaced, 'procedural trees with textured OBJ models');
-    }).catch(e => console.warn('OBJ trees failed, keeping procedural:', e));
+        const statusEl2 = document.getElementById('objstatus');
+        if (statusEl2) {
+            statusEl2.style.color = '#8aff8a';
+            statusEl2.style.borderColor = '#8aff8a';
+            statusEl2.textContent = 'TREES: ' + replaced + ' textured trees placed';
+            setTimeout(() => { statusEl2.style.transition = 'opacity 1.5s'; statusEl2.style.opacity = '0'; }, 3000);
+        }
+    }).catch(e => {
+        console.warn('OBJ trees failed, keeping procedural:', e);
+        const statusEl3 = document.getElementById('objstatus');
+        if (statusEl3) {
+            statusEl3.style.color = '#ff6060';
+            statusEl3.style.borderColor = '#ff6060';
+            statusEl3.textContent = 'TREES: OBJ load failed — ' + (e.message || e);
+        }
+    });
 
     // ----- Build the actual village structures (after props) -----
     for (const v of villageCenters) {
