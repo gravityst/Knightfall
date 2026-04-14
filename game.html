@@ -3154,15 +3154,31 @@
         if (!matSet) return null;
 
         const tree = src.clone();
+        // Map a material (by its .name) to one of our textured materials
+        function mapMat(m) {
+            if (!m) return m;
+            const mname = m.name || '';
+            if (matSet[mname]) return matSet[mname];
+            if (mname) {
+                const key = Object.keys(matSet).find(k => mname.toLowerCase().includes(k.toLowerCase().split('_')[0]));
+                if (key) return matSet[key];
+            }
+            // Heuristic fallback: if the material name hints at leaves, use the leaf mat
+            const leafKey = Object.keys(matSet).find(k => k.toLowerCase().includes('leaves'));
+            const barkKey = Object.keys(matSet).find(k => k.toLowerCase().includes('bark'));
+            if (mname.toLowerCase().includes('leaf') || mname.toLowerCase().includes('leaves')) {
+                if (leafKey) return matSet[leafKey];
+            }
+            if (barkKey) return matSet[barkKey];
+            return m;
+        }
+
         tree.traverse(child => {
             if (child.isMesh) {
-                const mname = child.material.name;
-                // Try exact match, then keyword match
-                if (matSet[mname]) {
-                    child.material = matSet[mname];
+                if (Array.isArray(child.material)) {
+                    child.material = child.material.map(mapMat);
                 } else {
-                    const key = Object.keys(matSet).find(k => mname.toLowerCase().includes(k.toLowerCase().split('_')[0]));
-                    if (key) child.material = matSet[key];
+                    child.material = mapMat(child.material);
                 }
                 child.castShadow = true;
                 child.receiveShadow = true;
