@@ -3947,52 +3947,52 @@
     // animName provides the best idle/walk/gallop/attack/death animation names for each animal.
     // scale is tuned so the model reads roughly correctly against a ~1.65m player.
     const SPEC_FOX = {
-        model: 'Fox',  scale: 0.8,
+        model: 'Fox',  scale: 0.45,
         idleAnim: 'Idle', walkAnim: 'Walk', runAnim: 'Gallop',
         eatAnim: 'Eating', deathAnim: 'Death',
-        speedWalk: 1.6, speedFlee: 10, fleeR: 14,
+        speedWalk: 2.8, speedFlee: 14, fleeR: 14,
     };
     const SPEC_DEER = {
-        model: 'Deer', scale: 1.25,
+        model: 'Deer', scale: 0.7,
         idleAnim: 'Idle', walkAnim: 'Walk', runAnim: 'Gallop',
         eatAnim: 'Eating', deathAnim: 'Death',
-        speedWalk: 2.4, speedFlee: 11, fleeR: 26,
+        speedWalk: 3.5, speedFlee: 14, fleeR: 26,
     };
     const SPEC_STAG = {
-        model: 'Stag', scale: 1.55,
+        model: 'Stag', scale: 0.85,
         idleAnim: 'Idle', walkAnim: 'Walk', runAnim: 'Gallop',
         eatAnim: 'Eating', deathAnim: 'Death',
-        speedWalk: 2.2, speedFlee: 12, fleeR: 30,
+        speedWalk: 3.2, speedFlee: 15, fleeR: 30,
     };
     const SPEC_WOLF = {
-        model: 'Wolf', scale: 1.2,
+        model: 'Wolf', scale: 0.6,
         idleAnim: 'Idle', walkAnim: 'Walk', runAnim: 'Gallop',
         attackAnim: 'Attack', deathAnim: 'Death',
-        speedWalk: 2.0, speedChase: 7.0, chaseR: 22,
+        speedWalk: 3.0, speedChase: 9.0, chaseR: 22,
     };
     const SPEC_COW = {
-        model: 'Cow', scale: 1.3,
+        model: 'Cow', scale: 0.75,
         idleAnim: 'Idle', walkAnim: 'Walk', runAnim: 'Gallop',
         eatAnim: 'Eating', deathAnim: 'Death',
-        speedWalk: 1.2, speedFlee: 6, fleeR: 10,
+        speedWalk: 1.8, speedFlee: 8, fleeR: 10,
     };
     const SPEC_HORSE = {
-        model: 'Horse', scale: 1.4,
+        model: 'Horse', scale: 0.9,
         idleAnim: 'Idle', walkAnim: 'Walk', runAnim: 'Gallop',
         eatAnim: 'Eating', deathAnim: 'Death',
-        speedWalk: 2.0, speedFlee: 12, fleeR: 14,
+        speedWalk: 3.0, speedFlee: 14, fleeR: 14,
     };
     const SPEC_ALPACA = {
-        model: 'Alpaca', scale: 1.1,
+        model: 'Alpaca', scale: 0.6,
         idleAnim: 'Idle', walkAnim: 'Walk', runAnim: 'Gallop',
         eatAnim: 'Eating', deathAnim: 'Death',
-        speedWalk: 1.4, speedFlee: 7, fleeR: 12,
+        speedWalk: 2.0, speedFlee: 9, fleeR: 12,
     };
     const SPEC_BULL = {
-        model: 'Bull', scale: 1.4,
+        model: 'Bull', scale: 0.85,
         idleAnim: 'Idle', walkAnim: 'Walk', runAnim: 'Gallop',
         attackAnim: 'Attack_Headbutt', deathAnim: 'Death',
-        speedWalk: 1.4, speedChase: 8, chaseR: 18,
+        speedWalk: 2.2, speedChase: 10, chaseR: 18,
     };
 
     // Legacy aliases so any code still referencing the old specs keeps working
@@ -4024,8 +4024,8 @@
             playAnimation(g, spec.idleAnim, 0);
             animals.push({
                 spec, obj: g, x, z,
-                wanderT: rand(0, 4),
-                dirX: rand(-1, 1), dirZ: rand(-1, 1),
+                wanderT: rand(-0.1, 0.1),
+                dirX: 0, dirZ: 0,
                 state: 'idle',
                 stateT: rand(1, 4),
                 speed: 0,
@@ -4189,6 +4189,30 @@
     const staminaEl = document.getElementById('stamina').firstElementChild;
     // Collision: trees + per-wall house slabs (in the house's local frame).
     const PLAYER_R = 0.30;
+    // Animals-only collision: houses and colliders, but not trees
+    function collideHousesOnly(x, z) {
+        for (const h of houseColliders) {
+            if (!h.w) continue;
+            if (h.doorOpen) continue;
+            const dx = x - h.x, dz = z - h.z;
+            const cosR = Math.cos(-h.rot), sinR = Math.sin(-h.rot);
+            const lx = dx * cosR - dz * sinR;
+            const lz = dx * sinR + dz * cosR;
+            const halfW = h.w / 2, halfD = h.d / 2;
+            if (lx < -halfW - PLAYER_R || lx > halfW + PLAYER_R) continue;
+            if (lz < -halfD - PLAYER_R || lz > halfD + PLAYER_R) continue;
+            // Inside house footprint; push to nearest edge
+            const pushX = Math.abs(lx) > halfW ? Math.sign(lx) * (halfW + PLAYER_R) : lx;
+            const pushZ = Math.abs(lz) > halfD ? Math.sign(lz) * (halfD + PLAYER_R) : lz;
+            const cosF = Math.cos(h.rot), sinF = Math.sin(h.rot);
+            return {
+                x: h.x + pushX * cosF - pushZ * sinF,
+                z: h.z + pushX * sinF + pushZ * cosF,
+            };
+        }
+        return null;
+    }
+
     function collide(x, z) {
         // Trees: circular trunk
         for (const t of trees) {
@@ -4494,11 +4518,11 @@
             if (a.x >  WORLD/2 - 30) a.x =  WORLD/2 - 30;
             if (a.z < -WORLD/2 + 30) a.z = -WORLD/2 + 30;
             if (a.z >  WORLD/2 - 30) a.z =  WORLD/2 - 30;
-            // Collide with house walls (same check as the player)
-            const aHit = collide(a.x, a.z);
+            // Animals ignore tree collision (they can walk through trunks visually)
+            // but still collide with house walls.
+            const aHit = collideHousesOnly(a.x, a.z);
             if (aHit) {
                 a.x = aHit.x; a.z = aHit.z;
-                // Reverse wander direction so they don't keep ramming the wall
                 a.dirX = -a.dirX; a.dirZ = -a.dirZ;
                 a.wanderT = 0;
             }
