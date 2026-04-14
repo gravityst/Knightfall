@@ -15,6 +15,8 @@
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/loaders/OBJLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/utils/SkeletonUtils.js"></script>
     <script>
         window.addEventListener('error', e => {
             const d = document.createElement('div');
@@ -30,6 +32,7 @@
     <div id="crosshair">+</div>
     <div id="stamina"><div></div></div>
     <div id="objstatus" style="position:absolute;top:48px;left:20px;color:#ffa050;background:rgba(0,0,0,0.65);border:1px solid #ffa050;padding:6px 12px;z-index:11;font:13px 'IM Fell English SC',Georgia,serif;letter-spacing:1px;">TREES: loading textured models…</div>
+    <div id="animstatus" style="position:absolute;top:82px;left:20px;color:#ffa050;background:rgba(0,0,0,0.65);border:1px solid #ffa050;padding:6px 12px;z-index:11;font:13px 'IM Fell English SC',Georgia,serif;letter-spacing:1px;">ANIMALS: loading animated models…</div>
     <div id="doorprompt" style="position:absolute;top:55%;left:50%;transform:translateX(-50%);color:#fff0c8;background:rgba(0,0,0,0.55);border:1px solid #d4af37;padding:8px 16px;font:14px 'IM Fell English SC',Georgia,serif;letter-spacing:1px;z-index:10;display:none;text-shadow:0 0 6px #000;"></div>
 
     <script>
@@ -3867,21 +3870,134 @@
     */
 
     // ----- Behavior specs (anatomy is in the build* functions) -----
-    const SPEC_RABBIT = {
-        build: buildRabbit,
-        speedWalk: 1.6, speedFlee: 12, fleeR: 14,
-        cycleSpeed: 14, legAmp: 0.7,
+    // ===================================================================
+    //  QUATERNIUS ANIMAL MODELS — GLTF with baked-in animations
+    // ===================================================================
+    const gltfLoader = new THREE.GLTFLoader();
+    const animalModels = {};  // name -> { scene, animations: {clipName: clip} }
+
+    function loadGLTF(path) {
+        return new Promise((res, rej) => gltfLoader.load(path, res, undefined, rej));
+    }
+
+    async function loadAnimalModels() {
+        const names = ['Deer','Stag','Fox','Wolf','Cow','Horse','Alpaca','Bull','Donkey'];
+        await Promise.all(names.map(async name => {
+            try {
+                const gltf = await loadGLTF('assets/models/animals/' + name + '.gltf');
+                const clips = {};
+                for (const clip of gltf.animations) clips[clip.name] = clip;
+                animalModels[name] = { scene: gltf.scene, clips };
+            } catch(e) { console.warn('Failed to load animal:', name, e); }
+        }));
+        console.log('Animal models loaded:', Object.keys(animalModels).length);
+        const aEl = document.getElementById('animstatus');
+        if (aEl) aEl.textContent = 'ANIMALS: loaded ' + Object.keys(animalModels).length + ' models, spawning…';
+    }
+
+    // Build a cloned animal with its own AnimationMixer
+    function buildGltfAnimal(modelName, scale) {
+        const src = animalModels[modelName];
+        if (!src) return null;
+
+        // Use SkeletonUtils.clone so skinning works per-instance
+        const scene = THREE.SkeletonUtils.clone(src.scene);
+        scene.traverse(c => {
+            if (c.isMesh || c.isSkinnedMesh) {
+                c.castShadow = true;
+                c.receiveShadow = true;
+            }
+        });
+
+        const group = new THREE.Group();
+        group.add(scene);
+        group.scale.setScalar(scale);
+
+        // Build actions from the shared clips (per-instance mixer)
+        const mixer = new THREE.AnimationMixer(scene);
+        const actions = {};
+        for (const [name, clip] of Object.entries(src.clips)) {
+            actions[name] = mixer.clipAction(clip);
+        }
+        group.userData.mixer = mixer;
+        group.userData.actions = actions;
+        group.userData.currentAction = null;
+        return group;
+    }
+
+    // Play a named animation, crossfading from the current one
+    function playAnimation(group, actionName, fadeTime = 0.25) {
+        const actions = group.userData.actions;
+        if (!actions || !actions[actionName]) return;
+        const next = actions[actionName];
+        const prev = group.userData.currentAction;
+        if (prev === next) return;
+        next.enabled = true;
+        next.setEffectiveTimeScale(1);
+        next.setEffectiveWeight(1);
+        next.reset();
+        if (prev) {
+            next.crossFadeFrom(prev, fadeTime, false);
+        }
+        next.play();
+        group.userData.currentAction = next;
+    }
+
+    // ----- Animal specs (Quaternius GLTFs) -----
+    // animName provides the best idle/walk/gallop/attack/death animation names for each animal.
+    // scale is tuned so the model reads roughly correctly against a ~1.65m player.
+    const SPEC_FOX = {
+        model: 'Fox',  scale: 0.8,
+        idleAnim: 'Idle', walkAnim: 'Walk', runAnim: 'Gallop',
+        eatAnim: 'Eating', deathAnim: 'Death',
+        speedWalk: 1.6, speedFlee: 10, fleeR: 14,
     };
     const SPEC_DEER = {
-        build: buildDeer,
+        model: 'Deer', scale: 1.25,
+        idleAnim: 'Idle', walkAnim: 'Walk', runAnim: 'Gallop',
+        eatAnim: 'Eating', deathAnim: 'Death',
         speedWalk: 2.4, speedFlee: 11, fleeR: 26,
-        cycleSpeed: 7,  legAmp: 0.5,
     };
-    const SPEC_BEAR = {
-        build: buildBear,
-        speedWalk: 1.8, speedChase: 6.0, chaseR: 16,
-        cycleSpeed: 5,  legAmp: 0.4,
+    const SPEC_STAG = {
+        model: 'Stag', scale: 1.55,
+        idleAnim: 'Idle', walkAnim: 'Walk', runAnim: 'Gallop',
+        eatAnim: 'Eating', deathAnim: 'Death',
+        speedWalk: 2.2, speedFlee: 12, fleeR: 30,
     };
+    const SPEC_WOLF = {
+        model: 'Wolf', scale: 1.2,
+        idleAnim: 'Idle', walkAnim: 'Walk', runAnim: 'Gallop',
+        attackAnim: 'Attack', deathAnim: 'Death',
+        speedWalk: 2.0, speedChase: 7.0, chaseR: 22,
+    };
+    const SPEC_COW = {
+        model: 'Cow', scale: 1.3,
+        idleAnim: 'Idle', walkAnim: 'Walk', runAnim: 'Gallop',
+        eatAnim: 'Eating', deathAnim: 'Death',
+        speedWalk: 1.2, speedFlee: 6, fleeR: 10,
+    };
+    const SPEC_HORSE = {
+        model: 'Horse', scale: 1.4,
+        idleAnim: 'Idle', walkAnim: 'Walk', runAnim: 'Gallop',
+        eatAnim: 'Eating', deathAnim: 'Death',
+        speedWalk: 2.0, speedFlee: 12, fleeR: 14,
+    };
+    const SPEC_ALPACA = {
+        model: 'Alpaca', scale: 1.1,
+        idleAnim: 'Idle', walkAnim: 'Walk', runAnim: 'Gallop',
+        eatAnim: 'Eating', deathAnim: 'Death',
+        speedWalk: 1.4, speedFlee: 7, fleeR: 12,
+    };
+    const SPEC_BULL = {
+        model: 'Bull', scale: 1.4,
+        idleAnim: 'Idle', walkAnim: 'Walk', runAnim: 'Gallop',
+        attackAnim: 'Attack_Headbutt', deathAnim: 'Death',
+        speedWalk: 1.4, speedChase: 8, chaseR: 18,
+    };
+
+    // Legacy aliases so any code still referencing the old specs keeps working
+    const SPEC_RABBIT = SPEC_FOX;
+    const SPEC_BEAR   = SPEC_WOLF;
 
     function spawnAnimal(spec, count, nearX, nearZ, radius) {
         for (let i = 0; i < count; i++) {
@@ -3899,22 +4015,35 @@
                 h = heightAt(x, z);
                 if (distToRiver(x, z) > 30 && h > 12 && h < 38) break;
             }
-            const g = spec.build();
+            const g = buildGltfAnimal(spec.model, spec.scale);
+            if (!g) continue;  // model not loaded yet
             g.position.set(x, sampleGroundY(x, z), z);
+            g.rotation.y = Math.random() * Math.PI * 2;
             propRoot.add(g);
+            // Start in idle animation
+            playAnimation(g, spec.idleAnim, 0);
             animals.push({
                 spec, obj: g, x, z,
-                phase: Math.random() * Math.PI * 2,
                 wanderT: rand(0, 4),
                 dirX: rand(-1, 1), dirZ: rand(-1, 1),
+                state: 'idle',
+                stateT: rand(1, 4),
                 speed: 0,
+                alive: true,
             });
         }
     }
-    // Scattered across the world
-    spawnAnimal(SPEC_RABBIT, 30);
-    spawnAnimal(SPEC_DEER,   12);
-    spawnAnimal(SPEC_BEAR,    4);
+    // Scatter Quaternius animals across the world — load then spawn
+    function doAnimalSpawn() {
+        spawnAnimal(SPEC_FOX,    16);
+        spawnAnimal(SPEC_DEER,    8);
+        spawnAnimal(SPEC_STAG,    4);
+        spawnAnimal(SPEC_WOLF,    5);
+        spawnAnimal(SPEC_COW,     6);
+        spawnAnimal(SPEC_HORSE,   4);
+        spawnAnimal(SPEC_ALPACA,  5);
+        spawnAnimal(SPEC_BULL,    2);
+    }
     // (A guaranteed cluster near the player is added after spawn is chosen.)
 
     // (sampleGroundY + CELL are defined earlier, right after the terrain mesh.)
@@ -3949,9 +4078,37 @@
     }
 
     // Guaranteed cluster of animals very near the player so they're easy to find.
-    spawnAnimal(SPEC_RABBIT, 5, spawn.x, spawn.z, 70);
-    spawnAnimal(SPEC_DEER,   3, spawn.x, spawn.z, 110);
-    spawnAnimal(SPEC_BEAR,   1, spawn.x, spawn.z, 160);
+    function doNearPlayerSpawn() {
+        spawnAnimal(SPEC_FOX,    3, spawn.x, spawn.z, 70);
+        spawnAnimal(SPEC_DEER,   2, spawn.x, spawn.z, 110);
+        spawnAnimal(SPEC_STAG,   1, spawn.x, spawn.z, 130);
+        spawnAnimal(SPEC_COW,    2, spawn.x, spawn.z, 90);
+        spawnAnimal(SPEC_HORSE,  1, spawn.x, spawn.z, 100);
+        spawnAnimal(SPEC_ALPACA, 2, spawn.x, spawn.z, 95);
+        spawnAnimal(SPEC_WOLF,   1, spawn.x, spawn.z, 160);
+    }
+
+    // Kick off animal loading; spawn when ready
+    loadAnimalModels().then(() => {
+        doAnimalSpawn();
+        doNearPlayerSpawn();
+        console.log('Spawned', animals.length, 'animated animals');
+        const aEl2 = document.getElementById('animstatus');
+        if (aEl2) {
+            aEl2.style.color = '#8aff8a';
+            aEl2.style.borderColor = '#8aff8a';
+            aEl2.textContent = 'ANIMALS: ' + animals.length + ' animated animals roaming';
+            setTimeout(() => { aEl2.style.transition = 'opacity 1.5s'; aEl2.style.opacity = '0'; }, 3500);
+        }
+    }).catch(e => {
+        console.warn('Animal models failed:', e);
+        const aEl3 = document.getElementById('animstatus');
+        if (aEl3) {
+            aEl3.style.color = '#ff6060';
+            aEl3.style.borderColor = '#ff6060';
+            aEl3.textContent = 'ANIMALS: load failed — ' + (e.message || e);
+        }
+    });
 
     // Sword in hand — blade + cross-guard + grip + pommel
     const sword = new THREE.Group();
@@ -4350,18 +4507,26 @@
             // group rotation around Y is atan2(dirX, dirZ) - PI/2.
             a.obj.rotation.y = Math.atan2(dirX, dirZ) - Math.PI / 2;
 
-            // Walk cycle: paired-diagonal gait (FL+BR, FR+BL)
-            const cycleRate = s.cycleSpeed * (sp / s.speedWalk);
-            a.phase += cycleRate * dt;
-            const amp = s.legAmp * Math.min(1.4, sp / s.speedWalk);
-            const legs = a.obj.userData.legs;
-            // Legs swing FORWARD/BACKWARD along the body's X axis,
-            // so rotate each leg pivot around Z (perpendicular to X and Y).
-            // Diagonal gait: FL+BR in phase, FR+BL half-cycle offset.
-            legs[0].rotation.z =  Math.sin(a.phase)             * amp;  // FL
-            legs[3].rotation.z =  Math.sin(a.phase)             * amp;  // BR
-            legs[1].rotation.z =  Math.sin(a.phase + Math.PI)   * amp;  // FR
-            legs[2].rotation.z =  Math.sin(a.phase + Math.PI)   * amp;  // BL
+            // GLTF-based animation: pick clip by speed / state, advance mixer
+            if (a.obj.userData.mixer) {
+                const mixer = a.obj.userData.mixer;
+                let desired;
+                if (sp < 0.3)       desired = s.idleAnim || 'Idle';
+                else if (sp < 3.5)  desired = s.walkAnim || 'Walk';
+                else                desired = s.runAnim  || 'Gallop';
+                playAnimation(a.obj, desired, 0.25);
+                mixer.update(dt);
+            } else if (a.obj.userData.legs) {
+                // Procedural fallback: legacy paired-diagonal gait
+                const cycleRate = (s.cycleSpeed || 6) * (sp / (s.speedWalk || 2));
+                a.phase = (a.phase || 0) + cycleRate * dt;
+                const amp = (s.legAmp || 0.4) * Math.min(1.4, sp / (s.speedWalk || 2));
+                const legs = a.obj.userData.legs;
+                legs[0].rotation.z =  Math.sin(a.phase)           * amp;
+                legs[3].rotation.z =  Math.sin(a.phase)           * amp;
+                legs[1].rotation.z =  Math.sin(a.phase + Math.PI) * amp;
+                legs[2].rotation.z =  Math.sin(a.phase + Math.PI) * amp;
+            }
         }
 
         // Villager AI + walk-cycle leg animation
