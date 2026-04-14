@@ -3881,7 +3881,7 @@
     }
 
     async function loadAnimalModels() {
-        const names = ['Deer','Stag','Fox','Wolf','Cow','Horse','Alpaca','Bull','Donkey'];
+        const names = ['Deer','Stag','Fox','Wolf','Cow','Horse','Horse_White','Alpaca','Bull','Donkey','Husky','ShibaInu'];
         await Promise.all(names.map(async name => {
             try {
                 const gltf = await loadGLTF('assets/models/animals/' + name + '.gltf');
@@ -3894,6 +3894,126 @@
         const aEl = document.getElementById('animstatus');
         if (aEl) aEl.textContent = 'ANIMALS: loaded ' + Object.keys(animalModels).length + ' models, spawning…';
     }
+
+    // ===================================================================
+    //  MEDIEVAL VILLAGE MEGAKIT — Quaternius kitbash props
+    // ===================================================================
+    const villageProps = {};
+
+    async function loadVillageProps() {
+        const names = ['Prop_Wagon','Prop_Crate','Prop_WoodenFence_Single',
+                       'Prop_WoodenFence_Extension1','Prop_WoodenFence_Extension2',
+                       'Prop_MetalFence_Ornament','Prop_Chimney','Prop_Chimney2',
+                       'Prop_Vine1','Prop_Vine2','Prop_Vine4','Prop_Support',
+                       'Prop_Brick1','Prop_Brick2'];
+        await Promise.all(names.map(async name => {
+            try {
+                const gltf = await loadGLTF('assets/models/village/' + name + '.gltf');
+                villageProps[name] = gltf.scene;
+            } catch(e) { console.warn('Failed to load village prop:', name, e); }
+        }));
+        console.log('Village props loaded:', Object.keys(villageProps).length);
+    }
+
+    // Clone a village prop with shadow casting enabled
+    function makeVillageProp(name, scale) {
+        const src = villageProps[name];
+        if (!src) return null;
+        const clone = src.clone(true);
+        clone.traverse(c => {
+            if (c.isMesh) {
+                // Deep-clone materials so we can tweak them per instance without bleed
+                if (Array.isArray(c.material)) {
+                    c.material = c.material.map(m => m.clone());
+                } else {
+                    c.material = c.material.clone();
+                }
+                c.castShadow = true;
+                c.receiveShadow = true;
+            }
+        });
+        if (scale) clone.scale.setScalar(scale);
+        return clone;
+    }
+
+    // Add MegaKit props scattered around a village center
+    function decorateVillage(cx, cz) {
+        if (Object.keys(villageProps).length === 0) return;
+        const VILLAGE_R = 50;
+
+        // Wooden fence perimeter (partial ring of fence segments)
+        const fenceCount = 12 + Math.floor(Math.random() * 8);
+        for (let i = 0; i < fenceCount; i++) {
+            const ang = (i / fenceCount) * Math.PI * 2 + rand(-0.15, 0.15);
+            const r = VILLAGE_R * rand(0.9, 1.1);
+            const fx = cx + Math.cos(ang) * r;
+            const fz = cz + Math.sin(ang) * r;
+            const prop = makeVillageProp(Math.random() < 0.7 ? 'Prop_WoodenFence_Single' : 'Prop_WoodenFence_Extension1', 1.8);
+            if (!prop) continue;
+            prop.position.set(fx, sampleGroundY(fx, fz), fz);
+            prop.rotation.y = ang + Math.PI / 2;
+            propRoot.add(prop);
+        }
+
+        // Wagons (1-2 per village)
+        const wagonCount = 1 + Math.floor(Math.random() * 2);
+        for (let i = 0; i < wagonCount; i++) {
+            const ang = rand(0, Math.PI * 2);
+            const r = rand(12, 28);
+            const wx = cx + Math.cos(ang) * r;
+            const wz = cz + Math.sin(ang) * r;
+            const prop = makeVillageProp('Prop_Wagon', 2.2);
+            if (!prop) continue;
+            prop.position.set(wx, sampleGroundY(wx, wz), wz);
+            prop.rotation.y = rand(0, Math.PI * 2);
+            propRoot.add(prop);
+        }
+
+        // Crate piles (scattered)
+        const crateCount = 3 + Math.floor(Math.random() * 4);
+        for (let i = 0; i < crateCount; i++) {
+            const ang = rand(0, Math.PI * 2);
+            const r = rand(8, 32);
+            const crx = cx + Math.cos(ang) * r;
+            const crz = cz + Math.sin(ang) * r;
+            const crate = makeVillageProp('Prop_Crate', 1.5);
+            if (!crate) continue;
+            crate.position.set(crx, sampleGroundY(crx, crz), crz);
+            crate.rotation.y = rand(0, Math.PI * 2);
+            propRoot.add(crate);
+            // Sometimes a brick pile beside crates
+            if (Math.random() < 0.4) {
+                const brick = makeVillageProp(Math.random() < 0.5 ? 'Prop_Brick1' : 'Prop_Brick2', 1.2);
+                if (brick) {
+                    brick.position.set(crx + rand(-1.5, 1.5), sampleGroundY(crx, crz), crz + rand(-1.5, 1.5));
+                    brick.rotation.y = rand(0, Math.PI * 2);
+                    propRoot.add(brick);
+                }
+            }
+        }
+
+        // A few metal fence ornaments (decorative, at entrance)
+        for (let i = 0; i < 2; i++) {
+            const angle = rand(0, Math.PI * 2);
+            const r = rand(18, 25);
+            const mx = cx + Math.cos(angle) * r;
+            const mz = cz + Math.sin(angle) * r;
+            const orn = makeVillageProp('Prop_MetalFence_Ornament', 1.8);
+            if (!orn) continue;
+            orn.position.set(mx, sampleGroundY(mx, mz), mz);
+            orn.rotation.y = rand(0, Math.PI * 2);
+            propRoot.add(orn);
+        }
+    }
+
+    // Start loading village props in background
+    loadVillageProps().then(() => {
+        // Decorate all villages that were built earlier
+        if (typeof villageCenters !== 'undefined') {
+            for (const v of villageCenters) decorateVillage(v.cx, v.cz);
+        }
+        console.log('Villages decorated with MegaKit props');
+    }).catch(e => console.warn('Village props failed:', e));
 
     // Build a cloned animal with its own AnimationMixer
     function buildGltfAnimal(modelName, scale) {
@@ -3944,105 +4064,187 @@
     }
 
     // ----- Animal specs (Quaternius GLTFs) -----
-    // animName provides the best idle/walk/gallop/attack/death animation names for each animal.
-    // scale is tuned so the model reads roughly correctly against a ~1.65m player.
+    // Each spec: model, scale, animation names, speeds, behavior flags.
+    // herd: animals with same spec group cohesion toward centroid.
+    // pack: predators hunt together.
     const SPEC_FOX = {
         model: 'Fox',  scale: 0.45,
         idleAnim: 'Idle', walkAnim: 'Walk', runAnim: 'Gallop',
         eatAnim: 'Eating', deathAnim: 'Death',
         speedWalk: 2.8, speedFlee: 14, fleeR: 14,
+        social: 0.0,   // solitary
     };
     const SPEC_DEER = {
         model: 'Deer', scale: 0.7,
         idleAnim: 'Idle', walkAnim: 'Walk', runAnim: 'Gallop',
         eatAnim: 'Eating', deathAnim: 'Death',
         speedWalk: 3.5, speedFlee: 14, fleeR: 26,
+        social: 0.35, // light herd (families)
     };
     const SPEC_STAG = {
         model: 'Stag', scale: 0.85,
         idleAnim: 'Idle', walkAnim: 'Walk', runAnim: 'Gallop',
         eatAnim: 'Eating', deathAnim: 'Death',
         speedWalk: 3.2, speedFlee: 15, fleeR: 30,
+        social: 0.0,   // stags are loners
     };
     const SPEC_WOLF = {
         model: 'Wolf', scale: 0.6,
         idleAnim: 'Idle', walkAnim: 'Walk', runAnim: 'Gallop',
         attackAnim: 'Attack', deathAnim: 'Death',
         speedWalk: 3.0, speedChase: 9.0, chaseR: 22,
+        social: 0.7,   // pack hunters
+        pack: true,
     };
     const SPEC_COW = {
         model: 'Cow', scale: 0.75,
         idleAnim: 'Idle', walkAnim: 'Walk', runAnim: 'Gallop',
         eatAnim: 'Eating', deathAnim: 'Death',
         speedWalk: 1.8, speedFlee: 8, fleeR: 10,
+        social: 0.75,  // strong herd cohesion
     };
     const SPEC_HORSE = {
         model: 'Horse', scale: 0.9,
         idleAnim: 'Idle', walkAnim: 'Walk', runAnim: 'Gallop',
         eatAnim: 'Eating', deathAnim: 'Death',
         speedWalk: 3.0, speedFlee: 14, fleeR: 14,
+        social: 0.6,
+    };
+    const SPEC_HORSE_WHITE = {
+        model: 'Horse_White', scale: 0.9,
+        idleAnim: 'Idle', walkAnim: 'Walk', runAnim: 'Gallop',
+        eatAnim: 'Eating', deathAnim: 'Death',
+        speedWalk: 3.0, speedFlee: 14, fleeR: 14,
+        social: 0.6,
     };
     const SPEC_ALPACA = {
         model: 'Alpaca', scale: 0.6,
         idleAnim: 'Idle', walkAnim: 'Walk', runAnim: 'Gallop',
         eatAnim: 'Eating', deathAnim: 'Death',
         speedWalk: 2.0, speedFlee: 9, fleeR: 12,
+        social: 0.55,
     };
     const SPEC_BULL = {
         model: 'Bull', scale: 0.85,
         idleAnim: 'Idle', walkAnim: 'Walk', runAnim: 'Gallop',
         attackAnim: 'Attack_Headbutt', deathAnim: 'Death',
         speedWalk: 2.2, speedChase: 10, chaseR: 18,
+        social: 0.0,
+    };
+    const SPEC_DONKEY = {
+        model: 'Donkey', scale: 0.75,
+        idleAnim: 'Idle', walkAnim: 'Walk', runAnim: 'Gallop',
+        eatAnim: 'Eating', deathAnim: 'Death',
+        speedWalk: 1.6, speedFlee: 6, fleeR: 10,
+        social: 0.4,
+    };
+    const SPEC_HUSKY = {
+        model: 'Husky', scale: 0.5,
+        idleAnim: 'Idle', walkAnim: 'Walk', runAnim: 'Gallop',
+        eatAnim: 'Eating', deathAnim: 'Death',
+        speedWalk: 2.4, speedFlee: 10, fleeR: 8,
+        social: 0.5,
+    };
+    const SPEC_SHIBA = {
+        model: 'ShibaInu', scale: 0.4,
+        idleAnim: 'Idle', walkAnim: 'Walk', runAnim: 'Gallop',
+        eatAnim: 'Eating', deathAnim: 'Death',
+        speedWalk: 2.4, speedFlee: 10, fleeR: 8,
+        social: 0.3,
     };
 
     // Legacy aliases so any code still referencing the old specs keeps working
     const SPEC_RABBIT = SPEC_FOX;
     const SPEC_BEAR   = SPEC_WOLF;
 
-    function spawnAnimal(spec, count, nearX, nearZ, radius) {
-        for (let i = 0; i < count; i++) {
-            let x, z, h;
-            for (let tries = 0; tries < 60; tries++) {
-                if (nearX !== undefined) {
-                    const ang = rand(0, Math.PI * 2);
-                    const r = rand(15, radius);
-                    x = nearX + Math.cos(ang) * r;
-                    z = nearZ + Math.sin(ang) * r;
-                } else {
-                    x = rand(-WORLD/2 + 40, WORLD/2 - 40);
-                    z = rand(-WORLD/2 + 40, WORLD/2 - 40);
-                }
-                h = heightAt(x, z);
-                if (distToRiver(x, z) > 30 && h > 12 && h < 38) break;
+    // Spawn a single animal (helper used by both herd and solo spawning)
+    function spawnOneAnimal(spec, x, z, groupId) {
+        const g = buildGltfAnimal(spec.model, spec.scale);
+        if (!g) return null;
+        g.position.set(x, sampleGroundY(x, z), z);
+        g.rotation.y = Math.random() * Math.PI * 2;
+        propRoot.add(g);
+        playAnimation(g, spec.idleAnim, 0);
+        const a = {
+            spec, obj: g, x, z,
+            wanderT: rand(-0.1, 0.1),
+            dirX: 0, dirZ: 0,
+            groupId: groupId || 0,
+            state: 'idle',
+            stateT: rand(1, 4),
+            speed: 0,
+            alive: true,
+        };
+        animals.push(a);
+        return a;
+    }
+
+    // Find a valid spawn position (open land, on ground, away from river)
+    function findSpawnPos(nearX, nearZ, radius) {
+        let x, z, h;
+        for (let tries = 0; tries < 60; tries++) {
+            if (nearX !== undefined) {
+                const ang = rand(0, Math.PI * 2);
+                const r = rand(8, radius);
+                x = nearX + Math.cos(ang) * r;
+                z = nearZ + Math.sin(ang) * r;
+            } else {
+                x = rand(-WORLD/2 + 40, WORLD/2 - 40);
+                z = rand(-WORLD/2 + 40, WORLD/2 - 40);
             }
-            const g = buildGltfAnimal(spec.model, spec.scale);
-            if (!g) continue;  // model not loaded yet
-            g.position.set(x, sampleGroundY(x, z), z);
-            g.rotation.y = Math.random() * Math.PI * 2;
-            propRoot.add(g);
-            // Start in idle animation
-            playAnimation(g, spec.idleAnim, 0);
-            animals.push({
-                spec, obj: g, x, z,
-                wanderT: rand(-0.1, 0.1),
-                dirX: 0, dirZ: 0,
-                state: 'idle',
-                stateT: rand(1, 4),
-                speed: 0,
-                alive: true,
-            });
+            h = heightAt(x, z);
+            if (distToRiver(x, z) > 30 && h > 12 && h < 38) return { x, z };
+        }
+        return null;
+    }
+
+    // Spawn N groups of animals. Each group is a herd/pack clustered near a center point.
+    // groupSize: how many animals per group (2-8)
+    // groupCount: how many groups to spawn
+    // groupRadius: how spread out a single group is
+    let animalGroupCounter = 0;
+    function spawnHerd(spec, groupCount, groupSize, groupRadius) {
+        for (let g = 0; g < groupCount; g++) {
+            const center = findSpawnPos(undefined, undefined, 0);
+            if (!center) continue;
+            const groupId = ++animalGroupCounter;
+            const n = Math.round(groupSize + rand(-groupSize*0.3, groupSize*0.3));
+            for (let i = 0; i < n; i++) {
+                const pos = findSpawnPos(center.x, center.z, groupRadius);
+                if (!pos) continue;
+                spawnOneAnimal(spec, pos.x, pos.z, groupId);
+            }
         }
     }
-    // Scatter Quaternius animals across the world — load then spawn
+
+    // Legacy: single scattered spawning (for solitary animals)
+    function spawnAnimal(spec, count, nearX, nearZ, radius) {
+        for (let i = 0; i < count; i++) {
+            const pos = findSpawnPos(nearX, nearZ, radius || 0);
+            if (!pos) continue;
+            spawnOneAnimal(spec, pos.x, pos.z, 0);  // groupId 0 = solitary
+        }
+    }
+    // Realistic animal populations across a 1600m world:
+    // Common (scattered), Uncommon (small groups), Rare (few individuals)
     function doAnimalSpawn() {
-        spawnAnimal(SPEC_FOX,    16);
-        spawnAnimal(SPEC_DEER,    8);
-        spawnAnimal(SPEC_STAG,    4);
-        spawnAnimal(SPEC_WOLF,    5);
-        spawnAnimal(SPEC_COW,     6);
-        spawnAnimal(SPEC_HORSE,   4);
-        spawnAnimal(SPEC_ALPACA,  5);
-        spawnAnimal(SPEC_BULL,    2);
+        // --- COMMON species ---
+        spawnAnimal(SPEC_FOX,       10);                // solitary foxes
+        spawnHerd(SPEC_DEER,         4, 4, 18);         // 4 deer families (~16 deer)
+        spawnHerd(SPEC_COW,          3, 6, 12);         // 3 cattle herds (~18 cows)
+        spawnHerd(SPEC_ALPACA,       3, 5, 14);         // 3 alpaca herds (~15)
+
+        // --- UNCOMMON species ---
+        spawnHerd(SPEC_WOLF,         3, 4, 10);         // 3 wolf packs (~12 wolves)
+        spawnHerd(SPEC_HORSE,        2, 4, 14);         // 2 horse herds (~8)
+        spawnAnimal(SPEC_DONKEY,     6);                // scattered donkeys
+        spawnAnimal(SPEC_STAG,       4);                // solitary stags
+
+        // --- RARE species ---
+        spawnAnimal(SPEC_HORSE_WHITE, 2);               // rare white horses
+        spawnAnimal(SPEC_BULL,        2);               // rare lone bulls
+        spawnAnimal(SPEC_HUSKY,       3);               // wild huskies
+        spawnAnimal(SPEC_SHIBA,       2);               // wild shibas
     }
     // (A guaranteed cluster near the player is added after spawn is chosen.)
 
@@ -4079,13 +4281,12 @@
 
     // Guaranteed cluster of animals very near the player so they're easy to find.
     function doNearPlayerSpawn() {
-        spawnAnimal(SPEC_FOX,    3, spawn.x, spawn.z, 70);
-        spawnAnimal(SPEC_DEER,   2, spawn.x, spawn.z, 110);
-        spawnAnimal(SPEC_STAG,   1, spawn.x, spawn.z, 130);
-        spawnAnimal(SPEC_COW,    2, spawn.x, spawn.z, 90);
-        spawnAnimal(SPEC_HORSE,  1, spawn.x, spawn.z, 100);
-        spawnAnimal(SPEC_ALPACA, 2, spawn.x, spawn.z, 95);
-        spawnAnimal(SPEC_WOLF,   1, spawn.x, spawn.z, 160);
+        spawnAnimal(SPEC_FOX,    2, spawn.x, spawn.z, 70);
+        spawnAnimal(SPEC_DEER,   3, spawn.x, spawn.z, 110);  // small deer cluster
+        spawnAnimal(SPEC_COW,    4, spawn.x, spawn.z, 90);   // cattle near home
+        spawnAnimal(SPEC_HORSE,  2, spawn.x, spawn.z, 100);
+        spawnAnimal(SPEC_ALPACA, 3, spawn.x, spawn.z, 95);
+        spawnAnimal(SPEC_DONKEY, 1, spawn.x, spawn.z, 80);
     }
 
     // Kick off animal loading; spawn when ready
@@ -4483,6 +4684,14 @@
             t.obj.rotation.z = t.baseRotZ + Math.cos(phase * 0.8)  * windStrength;
         }
 
+        // Compute herd centroids once per frame (avg position of each group)
+        const herdCentroids = {};
+        for (const a of animals) {
+            if (!a.alive || a.groupId <= 0) continue;
+            const h = herdCentroids[a.groupId] || (herdCentroids[a.groupId] = { x: 0, z: 0, count: 0 });
+            h.x += a.x; h.z += a.z; h.count++;
+        }
+
         // Animal AI + walk-cycle leg animation
         for (const a of animals) {
             const s = a.spec;
@@ -4508,6 +4717,26 @@
                     a.dirZ = rand(-1, 1);
                     const m = Math.hypot(a.dirX, a.dirZ) || 1;
                     a.dirX /= m; a.dirZ /= m;
+
+                    // Herd cohesion: bias direction toward group centroid
+                    if (a.groupId > 0 && s.social > 0) {
+                        const cent = herdCentroids[a.groupId];
+                        if (cent && cent.count > 1) {
+                            const cx = cent.x / cent.count;
+                            const cz = cent.z / cent.count;
+                            const toC_x = cx - a.x;
+                            const toC_z = cz - a.z;
+                            const distC = Math.hypot(toC_x, toC_z) || 1;
+                            // If far from group, blend cohesion pull into wander direction
+                            if (distC > 8) {
+                                const weight = Math.min(1.0, s.social * (distC / 40));
+                                a.dirX = a.dirX * (1 - weight) + (toC_x / distC) * weight;
+                                a.dirZ = a.dirZ * (1 - weight) + (toC_z / distC) * weight;
+                                const m2 = Math.hypot(a.dirX, a.dirZ) || 1;
+                                a.dirX /= m2; a.dirZ /= m2;
+                            }
+                        }
+                    }
                 }
                 dirX = a.dirX; dirZ = a.dirZ;
                 sp = s.speedWalk;
