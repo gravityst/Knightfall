@@ -3393,7 +3393,100 @@
     for (const c of castleLocations) {
         buildCastle(c.cx, c.cz);
     }
-    if (_terrainEdited) {
+    // ====== ENHANCED GRASS + FLOWERS (denser, more variation) ======
+    (function addDetailedFoliage() {
+        // Create several grass-blade geometries for variety
+        const bladeGeos = [
+            new THREE.ConeGeometry(0.08, 0.65, 3),
+            new THREE.ConeGeometry(0.12, 0.9, 3),
+            new THREE.ConeGeometry(0.06, 0.45, 3),
+            new THREE.ConeGeometry(0.10, 1.15, 4),
+        ];
+        // Multiple grass color materials for natural variation
+        const grassColors = [0x4a6a2a, 0x5a7a32, 0x3e5a20, 0x6a8a3a, 0x355018, 0x78923a];
+        const grassMats = grassColors.map(c => new THREE.MeshLambertMaterial({ color: c, flatShading: true }));
+        // Flower: simple colored sphere atop a thin stalk
+        const stalkGeo = new THREE.CylinderGeometry(0.02, 0.025, 0.4, 4);
+        const stalkMat = new THREE.MeshLambertMaterial({ color: 0x4a6020 });
+        const petalGeos = [
+            new THREE.SphereGeometry(0.12, 5, 4),
+            new THREE.SphereGeometry(0.09, 5, 4),
+            new THREE.BoxGeometry(0.15, 0.06, 0.15),
+        ];
+        const flowerColors = [0xf0f0c0, 0xffe090, 0xff9090, 0xe9dcff, 0xffd3a0, 0xffffff, 0xf0a8d0];
+        const flowerMats = flowerColors.map(c => new THREE.MeshLambertMaterial({ color: c }));
+
+        const GRASS_CLUMP_COUNT = 1400;   // far denser than original 300
+        for (let i = 0; i < GRASS_CLUMP_COUNT; i++) {
+            const x = rand(-WORLD/2 + 20, WORLD/2 - 20);
+            const z = rand(-WORLD/2 + 20, WORLD/2 - 20);
+            const h = heightAt(x, z);
+            const b = biomeAt(x, z, h);
+            if (b === 6) continue;                // skip mountain
+            if (distToRiver(x, z) < RIVER_HALF + 2) continue;
+            // Biome-aware grass density
+            const density = b === 0 ? 0 : b === 1 ? 0.2 : b === 2 ? 1.0 : b === 3 ? 0.6 : b === 4 ? 0.3 : 0.4;
+            if (Math.random() > density) continue;
+
+            // A clump is a cluster of 3-8 grass blades
+            const clumpSize = 3 + Math.floor(Math.random() * 6);
+            for (let j = 0; j < clumpSize; j++) {
+                const bx = x + rand(-0.8, 0.8);
+                const bz = z + rand(-0.8, 0.8);
+                const by = sampleGroundY(bx, bz);
+                const geo = bladeGeos[Math.floor(Math.random() * bladeGeos.length)];
+                const mat = grassMats[Math.floor(Math.random() * grassMats.length)];
+                const blade = new THREE.Mesh(geo, mat);
+                const scl = 0.6 + Math.random() * 0.9;
+                blade.scale.set(scl * (0.7 + Math.random() * 0.6), scl * (0.8 + Math.random() * 0.8), scl * (0.7 + Math.random() * 0.6));
+                blade.position.set(bx, by + blade.scale.y * 0.5 * 0.5, bz);
+                blade.rotation.y = Math.random() * Math.PI * 2;
+                blade.rotation.x = rand(-0.2, 0.2);
+                blade.rotation.z = rand(-0.2, 0.2);
+                propRoot.add(blade);
+            }
+
+            // 20% of clumps have a flower in them
+            if (Math.random() < 0.20 && (b === 2 || b === 3)) {
+                const fx = x + rand(-0.5, 0.5);
+                const fz = z + rand(-0.5, 0.5);
+                const fy = sampleGroundY(fx, fz);
+                const stalk = new THREE.Mesh(stalkGeo, stalkMat);
+                stalk.position.set(fx, fy + 0.2, fz);
+                propRoot.add(stalk);
+                const petalGeo = petalGeos[Math.floor(Math.random() * petalGeos.length)];
+                const petalMat = flowerMats[Math.floor(Math.random() * flowerMats.length)];
+                const petal = new THREE.Mesh(petalGeo, petalMat);
+                petal.position.set(fx, fy + 0.42, fz);
+                petal.scale.set(0.7 + Math.random() * 0.5, 0.7 + Math.random() * 0.5, 0.7 + Math.random() * 0.5);
+                propRoot.add(petal);
+            }
+        }
+
+        // Bushes/shrubs in wooded areas — small tri-ball clusters
+        const shrubMat = [0x3a5a20, 0x4a6a2a, 0x2c4518].map(c => new THREE.MeshLambertMaterial({ color: c, flatShading: true }));
+        const shrubGeo = new THREE.IcosahedronGeometry(0.6, 0);
+        for (let i = 0; i < 300; i++) {
+            const x = rand(-WORLD/2 + 20, WORLD/2 - 20);
+            const z = rand(-WORLD/2 + 20, WORLD/2 - 20);
+            const h = heightAt(x, z);
+            const b = biomeAt(x, z, h);
+            if (b < 2 || b > 4) continue;
+            if (distToRiver(x, z) < RIVER_HALF + 2) continue;
+            if (Math.random() < 0.6) continue;
+            const sy = sampleGroundY(x, z);
+            const mat = shrubMat[Math.floor(Math.random() * 3)];
+            const shrub = new THREE.Mesh(shrubGeo, mat);
+            const s = 0.8 + Math.random() * 1.0;
+            shrub.scale.set(s * (0.9 + Math.random() * 0.4), s * (0.6 + Math.random() * 0.4), s * (0.9 + Math.random() * 0.4));
+            shrub.position.set(x, sy + s * 0.3, z);
+            shrub.rotation.y = Math.random() * Math.PI * 2;
+            shrub.castShadow = true;
+            propRoot.add(shrub);
+        }
+    })();
+
+        if (_terrainEdited) {
         groundGeo.attributes.position.needsUpdate = true;
         groundGeo.attributes.color.needsUpdate = true;
         groundGeo.computeVertexNormals();
@@ -4118,7 +4211,7 @@
             const r = VILLAGE_R * rand(0.9, 1.1);
             const fx = cx + Math.cos(ang) * r;
             const fz = cz + Math.sin(ang) * r;
-            const prop = makeVillageProp(Math.random() < 0.7 ? 'Prop_WoodenFence_Single' : 'Prop_WoodenFence_Extension1', 1.8);
+            const prop = makeVillageProp(Math.random() < 0.7 ? 'Prop_WoodenFence_Single' : 'Prop_WoodenFence_Extension1', 1.2);
             if (!prop) continue;
             prop.position.set(fx, sampleGroundY(fx, fz), fz);
             prop.rotation.y = ang + Math.PI / 2;
@@ -4132,7 +4225,7 @@
             const r = rand(12, 28);
             const wx = cx + Math.cos(ang) * r;
             const wz = cz + Math.sin(ang) * r;
-            const prop = makeVillageProp('Prop_Wagon', 2.2);
+            const prop = makeVillageProp('Prop_Wagon', 1.0);
             if (!prop) continue;
             prop.position.set(wx, sampleGroundY(wx, wz), wz);
             prop.rotation.y = rand(0, Math.PI * 2);
@@ -4146,14 +4239,14 @@
             const r = rand(8, 32);
             const crx = cx + Math.cos(ang) * r;
             const crz = cz + Math.sin(ang) * r;
-            const crate = makeVillageProp('Prop_Crate', 1.5);
+            const crate = makeVillageProp('Prop_Crate', 1.0);
             if (!crate) continue;
             crate.position.set(crx, sampleGroundY(crx, crz), crz);
             crate.rotation.y = rand(0, Math.PI * 2);
             propRoot.add(crate);
             // Sometimes a brick pile beside crates
             if (Math.random() < 0.4) {
-                const brick = makeVillageProp(Math.random() < 0.5 ? 'Prop_Brick1' : 'Prop_Brick2', 1.2);
+                const brick = makeVillageProp(Math.random() < 0.5 ? 'Prop_Brick1' : 'Prop_Brick2', 1.0);
                 if (brick) {
                     brick.position.set(crx + rand(-1.5, 1.5), sampleGroundY(crx, crz), crz + rand(-1.5, 1.5));
                     brick.rotation.y = rand(0, Math.PI * 2);
@@ -4168,7 +4261,7 @@
             const r = rand(18, 25);
             const mx = cx + Math.cos(angle) * r;
             const mz = cz + Math.sin(angle) * r;
-            const orn = makeVillageProp('Prop_MetalFence_Ornament', 1.8);
+            const orn = makeVillageProp('Prop_MetalFence_Ornament', 1.1);
             if (!orn) continue;
             orn.position.set(mx, sampleGroundY(mx, mz), mz);
             orn.rotation.y = rand(0, Math.PI * 2);
@@ -4176,27 +4269,34 @@
         }
 
         // --- Kit-built cottages scattered at village edge (decorative) ---
-        // Place 3-5 MegaKit houses outside the procedural house ring
-        const kitHouseCount = 3 + Math.floor(Math.random() * 3);
+        // Place 4-6 MegaKit houses outside the procedural house ring.
+        // Avoid overlap with procedural houses too.
+        const kitHouseCount = 4 + Math.floor(Math.random() * 3);
         const placedKit = [];
         for (let i = 0; i < kitHouseCount; i++) {
-            // Try several positions to avoid overlapping other kit houses
             let hx, hz, ok = false;
-            for (let tries = 0; tries < 30 && !ok; tries++) {
+            for (let tries = 0; tries < 50 && !ok; tries++) {
                 const ang = rand(0, Math.PI * 2);
-                const r = rand(30, 55);
+                const r = rand(35, 60);   // push further out
                 hx = cx + Math.cos(ang) * r;
                 hz = cz + Math.sin(ang) * r;
                 ok = true;
                 for (const p of placedKit) {
-                    if (Math.hypot(hx - p.x, hz - p.z) < 10) { ok = false; break; }
+                    if (Math.hypot(hx - p.x, hz - p.z) < 14) { ok = false; break; }
+                }
+                // Avoid overlapping procedural houses
+                if (ok && typeof houseColliders !== 'undefined') {
+                    for (const h of houseColliders) {
+                        if (!h.w) continue;
+                        if (Math.hypot(h.x - hx, h.z - hz) < 12) { ok = false; break; }
+                    }
                 }
             }
             if (!ok) continue;
 
             // Random house size (width x depth cells, each 2m)
-            const wCells = 2 + Math.floor(Math.random() * 2);  // 2 or 3 (4m or 6m wide)
-            const dCells = 2 + Math.floor(Math.random() * 2);  // 2 or 3 (4m or 6m deep)
+            const wCells = 3 + Math.floor(Math.random() * 2);  // 3 or 4 (6m or 8m wide)
+            const dCells = 2 + Math.floor(Math.random() * 3);  // 2-4 (4m, 6m, or 8m deep)
             const style = Math.random() < 0.5 ? 'brick' : 'plaster';
             const rotY = Math.random() * Math.PI * 2;
             const house = buildKitHouse(hx, hz, rotY, wCells, dCells, style);
@@ -4293,28 +4393,28 @@
     // herd: animals with same spec group cohesion toward centroid.
     // pack: predators hunt together.
     const SPEC_FOX = {
-        model: 'Fox',  scale: 0.45,
+        model: 'Fox',  scale: 0.7,
         idleAnim: 'Idle', walkAnim: 'Walk', runAnim: 'Gallop',
         eatAnim: 'Eating', deathAnim: 'Death',
         speedWalk: 2.8, speedFlee: 14, fleeR: 14,
         social: 0.0,   // solitary
     };
     const SPEC_DEER = {
-        model: 'Deer', scale: 0.7,
+        model: 'Deer', scale: 1.0,
         idleAnim: 'Idle', walkAnim: 'Walk', runAnim: 'Gallop',
         eatAnim: 'Eating', deathAnim: 'Death',
         speedWalk: 3.5, speedFlee: 14, fleeR: 26,
         social: 0.35, // light herd (families)
     };
     const SPEC_STAG = {
-        model: 'Stag', scale: 0.85,
+        model: 'Stag', scale: 1.2,
         idleAnim: 'Idle', walkAnim: 'Walk', runAnim: 'Gallop',
         eatAnim: 'Eating', deathAnim: 'Death',
         speedWalk: 3.2, speedFlee: 15, fleeR: 30,
         social: 0.0,   // stags are loners
     };
     const SPEC_WOLF = {
-        model: 'Wolf', scale: 0.6,
+        model: 'Wolf', scale: 0.85,
         idleAnim: 'Idle', walkAnim: 'Walk', runAnim: 'Gallop',
         attackAnim: 'Attack', deathAnim: 'Death',
         speedWalk: 3.0, speedChase: 9.0, chaseR: 22,
@@ -4322,56 +4422,56 @@
         pack: true,
     };
     const SPEC_COW = {
-        model: 'Cow', scale: 0.75,
+        model: 'Cow', scale: 1.05,
         idleAnim: 'Idle', walkAnim: 'Walk', runAnim: 'Gallop',
         eatAnim: 'Eating', deathAnim: 'Death',
         speedWalk: 1.8, speedFlee: 8, fleeR: 10,
         social: 0.75,  // strong herd cohesion
     };
     const SPEC_HORSE = {
-        model: 'Horse', scale: 0.9,
+        model: 'Horse', scale: 1.25,
         idleAnim: 'Idle', walkAnim: 'Walk', runAnim: 'Gallop',
         eatAnim: 'Eating', deathAnim: 'Death',
         speedWalk: 3.0, speedFlee: 14, fleeR: 14,
         social: 0.6,
     };
     const SPEC_HORSE_WHITE = {
-        model: 'Horse_White', scale: 0.9,
+        model: 'Horse_White', scale: 1.25,
         idleAnim: 'Idle', walkAnim: 'Walk', runAnim: 'Gallop',
         eatAnim: 'Eating', deathAnim: 'Death',
         speedWalk: 3.0, speedFlee: 14, fleeR: 14,
         social: 0.6,
     };
     const SPEC_ALPACA = {
-        model: 'Alpaca', scale: 0.6,
+        model: 'Alpaca', scale: 0.85,
         idleAnim: 'Idle', walkAnim: 'Walk', runAnim: 'Gallop',
         eatAnim: 'Eating', deathAnim: 'Death',
         speedWalk: 2.0, speedFlee: 9, fleeR: 12,
         social: 0.55,
     };
     const SPEC_BULL = {
-        model: 'Bull', scale: 0.85,
+        model: 'Bull', scale: 1.15,
         idleAnim: 'Idle', walkAnim: 'Walk', runAnim: 'Gallop',
         attackAnim: 'Attack_Headbutt', deathAnim: 'Death',
         speedWalk: 2.2, speedChase: 10, chaseR: 18,
         social: 0.0,
     };
     const SPEC_DONKEY = {
-        model: 'Donkey', scale: 0.75,
+        model: 'Donkey', scale: 1.0,
         idleAnim: 'Idle', walkAnim: 'Walk', runAnim: 'Gallop',
         eatAnim: 'Eating', deathAnim: 'Death',
         speedWalk: 1.6, speedFlee: 6, fleeR: 10,
         social: 0.4,
     };
     const SPEC_HUSKY = {
-        model: 'Husky', scale: 0.5,
+        model: 'Husky', scale: 0.7,
         idleAnim: 'Idle', walkAnim: 'Walk', runAnim: 'Gallop',
         eatAnim: 'Eating', deathAnim: 'Death',
         speedWalk: 2.4, speedFlee: 10, fleeR: 8,
         social: 0.5,
     };
     const SPEC_SHIBA = {
-        model: 'ShibaInu', scale: 0.4,
+        model: 'ShibaInu', scale: 0.55,
         idleAnim: 'Idle', walkAnim: 'Walk', runAnim: 'Gallop',
         eatAnim: 'Eating', deathAnim: 'Death',
         speedWalk: 2.4, speedFlee: 10, fleeR: 8,
@@ -4981,9 +5081,9 @@
                 a.wanderT = 0;
             }
             a.obj.position.set(a.x, sampleGroundY(a.x, a.z), a.z);
-            // Face direction of travel. Body's +X is its forward, so the
-            // group rotation around Y is atan2(dirX, dirZ) - PI/2.
-            a.obj.rotation.y = Math.atan2(dirX, dirZ) - Math.PI / 2;
+            // GLTF animals face +Z forward (Quaternius convention).
+            // Procedural animals (legacy, none remain) faced +X, needed a -PI/2 offset.
+            a.obj.rotation.y = Math.atan2(dirX, dirZ);
 
             // GLTF-based animation: pick clip by speed / state, advance mixer
             if (a.obj.userData.mixer) {
