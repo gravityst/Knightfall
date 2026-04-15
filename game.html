@@ -3901,11 +3901,21 @@
     const villageProps = {};
 
     async function loadVillageProps() {
-        const names = ['Prop_Wagon','Prop_Crate','Prop_WoodenFence_Single',
-                       'Prop_WoodenFence_Extension1','Prop_WoodenFence_Extension2',
-                       'Prop_MetalFence_Ornament','Prop_Chimney','Prop_Chimney2',
-                       'Prop_Vine1','Prop_Vine2','Prop_Vine4','Prop_Support',
-                       'Prop_Brick1','Prop_Brick2'];
+        const names = [
+            // Props
+            'Prop_Wagon','Prop_Crate','Prop_WoodenFence_Single',
+            'Prop_WoodenFence_Extension1','Prop_WoodenFence_Extension2',
+            'Prop_MetalFence_Ornament','Prop_Chimney','Prop_Chimney2',
+            'Prop_Vine1','Prop_Vine2','Prop_Vine4','Prop_Support',
+            'Prop_Brick1','Prop_Brick2',
+            // Building pieces
+            'Wall_Plaster_Straight','Wall_Plaster_Door_Flat','Wall_Plaster_Window_Wide_Flat',
+            'Wall_UnevenBrick_Straight','Wall_UnevenBrick_Door_Flat','Wall_UnevenBrick_Window_Wide_Flat',
+            'Corner_Exterior_Wood','Corner_Exterior_Brick',
+            'Door_1_Flat','Door_2_Flat','DoorFrame_Flat_Brick','DoorFrame_Flat_WoodDark',
+            'Roof_2x4_RoundTile','Roof_Modular_RoundTiles','Roof_Front_Brick2','Roof_Front_Brick4',
+            'Floor_Brick','Floor_WoodDark_Half1',
+        ];
         await Promise.all(names.map(async name => {
             try {
                 const gltf = await loadGLTF('assets/models/village/' + name + '.gltf');
@@ -3915,25 +3925,185 @@
         console.log('Village props loaded:', Object.keys(villageProps).length);
     }
 
-    // Clone a village prop with shadow casting enabled
+    // Low-poly material override: strip PBR textures, use flat colored Lambert
+    // based on material name hints — matches the game's stylized aesthetic.
+    function lowPolyMatForName(name) {
+        const n = (name || '').toLowerCase();
+        let color = 0xaaa090;
+        if (n.includes('plaster')) color = 0xe5d8b8;          // cream plaster
+        else if (n.includes('red') && n.includes('brick')) color = 0xa84b3a;
+        else if (n.includes('uneven') && n.includes('brick')) color = 0xa67e5b;  // tan brick
+        else if (n.includes('brick')) color = 0xb68764;
+        else if (n.includes('wood') && n.includes('dark')) color = 0x3a2515;
+        else if (n.includes('wood')) color = 0x6b3f20;         // warm brown wood
+        else if (n.includes('tile') || n.includes('round')) color = 0x8b3e2a;  // tile roof
+        else if (n.includes('metal')) color = 0x45443e;        // dark metal
+        else if (n.includes('vine') || n.includes('leaf')) color = 0x345020;
+        else if (n.includes('rock') || n.includes('stone')) color = 0x6a655a;
+        else if (n.includes('wear') || n.includes('brushed')) color = 0x988060;
+        return new THREE.MeshLambertMaterial({ color, flatShading: true });
+    }
+
+    function applyLowPoly(scene) {
+        scene.traverse(c => {
+            if (!c.isMesh) return;
+            if (Array.isArray(c.material)) {
+                c.material = c.material.map(m => { const nm = lowPolyMatForName(m && m.name); nm.name = m && m.name; return nm; });
+            } else {
+                const old = c.material;
+                c.material = lowPolyMatForName(old && old.name);
+                c.material.name = old && old.name;
+            }
+            c.castShadow = true;
+            c.receiveShadow = true;
+        });
+    }
+
+    // Clone a village prop with shadow casting + low-poly materials applied
     function makeVillageProp(name, scale) {
         const src = villageProps[name];
         if (!src) return null;
         const clone = src.clone(true);
-        clone.traverse(c => {
-            if (c.isMesh) {
-                // Deep-clone materials so we can tweak them per instance without bleed
-                if (Array.isArray(c.material)) {
-                    c.material = c.material.map(m => m.clone());
-                } else {
-                    c.material = c.material.clone();
-                }
-                c.castShadow = true;
-                c.receiveShadow = true;
-            }
-        });
+        applyLowPoly(clone);
         if (scale) clone.scale.setScalar(scale);
         return clone;
+    }
+
+    // ----- Kit house builder -----
+    // Assembles a walled cottage from 2m-grid wall pieces + corners + roof + door.
+    // wCells/dCells: number of 2m wall segments per side (e.g. 3x2 = 6m x 4m house)
+    // style: 'plaster' or 'brick'
+    function buildKitHouse(x, z, rotY, wCells, dCells, style) {
+        const g = new THREE.Group();
+        const W = wCells * 2;
+        const D = dCells * 2;
+        const WALL_H = 3.12;  // measured wall height
+
+        const wallSimple = style === 'brick' ? 'Wall_UnevenBrick_Straight' : 'Wall_Plaster_Straight';
+        const wallDoor   = style === 'brick' ? 'Wall_UnevenBrick_Door_Flat' : 'Wall_Plaster_Door_Flat';
+        const wallWin    = style === 'brick' ? 'Wall_UnevenBrick_Window_Wide_Flat' : 'Wall_Plaster_Window_Wide_Flat';
+        const corner     = style === 'brick' ? 'Corner_Exterior_Brick' : 'Corner_Exterior_Wood';
+
+        // --- Floor (2m grid) ---
+        for (let ix = 0; ix < wCells; ix++) {
+            for (let iz = 0; iz < dCells; iz++) {
+                const fl = makeVillageProp('Floor_Brick', 1.0);
+                if (!fl) continue;
+                const fx = -W/2 + 1 + ix * 2;
+                const fz = -D/2 + 1 + iz * 2;
+                fl.position.set(fx, 0, fz);
+                g.add(fl);
+            }
+        }
+
+        // --- Walls ---
+        const doorCellIdx = Math.floor(wCells / 2);  // front wall door in middle
+
+        // Front (+Z): one door, others plain or window
+        for (let i = 0; i < wCells; i++) {
+            let name;
+            if (i === doorCellIdx) name = wallDoor;
+            else if (Math.random() < 0.4) name = wallWin;
+            else name = wallSimple;
+            const w = makeVillageProp(name, 1.0);
+            if (!w) continue;
+            w.position.set(-W/2 + 1 + i * 2, 0, D/2);
+            g.add(w);
+        }
+        // Back (-Z): plain or window
+        for (let i = 0; i < wCells; i++) {
+            const name = Math.random() < 0.35 ? wallWin : wallSimple;
+            const w = makeVillageProp(name, 1.0);
+            if (!w) continue;
+            w.position.set(-W/2 + 1 + i * 2, 0, -D/2);
+            w.rotation.y = Math.PI;
+            g.add(w);
+        }
+        // Left (-X): plain or window, rotated
+        for (let i = 0; i < dCells; i++) {
+            const name = Math.random() < 0.3 ? wallWin : wallSimple;
+            const w = makeVillageProp(name, 1.0);
+            if (!w) continue;
+            w.position.set(-W/2, 0, -D/2 + 1 + i * 2);
+            w.rotation.y = -Math.PI / 2;
+            g.add(w);
+        }
+        // Right (+X)
+        for (let i = 0; i < dCells; i++) {
+            const name = Math.random() < 0.3 ? wallWin : wallSimple;
+            const w = makeVillageProp(name, 1.0);
+            if (!w) continue;
+            w.position.set(W/2, 0, -D/2 + 1 + i * 2);
+            w.rotation.y = Math.PI / 2;
+            g.add(w);
+        }
+
+        // --- Corners ---
+        const cornerSet = [
+            [-W/2, -D/2, Math.PI],         // back-left
+            [ W/2, -D/2, -Math.PI/2],      // back-right
+            [-W/2,  D/2, Math.PI/2],       // front-left
+            [ W/2,  D/2, 0],               // front-right
+        ];
+        for (const [cx_, cz_, cr] of cornerSet) {
+            const c = makeVillageProp(corner, 1.0);
+            if (!c) continue;
+            c.position.set(cx_, 0, cz_);
+            c.rotation.y = cr;
+            g.add(c);
+        }
+
+        // --- Door panel in the front opening ---
+        const doorName = style === 'brick' ? 'DoorFrame_Flat_Brick' : 'DoorFrame_Flat_WoodDark';
+        const frame = makeVillageProp(doorName, 1.0);
+        if (frame) {
+            frame.position.set(-W/2 + 1 + doorCellIdx * 2, 0, D/2 - 0.1);
+            g.add(frame);
+        }
+        const door = makeVillageProp('Door_1_Flat', 1.0);
+        if (door) {
+            door.position.set(-W/2 + 1 + doorCellIdx * 2 - 0.55, 0, D/2 - 0.15);
+            g.add(door);
+        }
+
+        // --- Roof: scale Roof_2x4_RoundTile to cover footprint ---
+        const roof = makeVillageProp('Roof_2x4_RoundTile', 1.0);
+        if (roof) {
+            roof.scale.set(W / 3.29, 1.0, D / 4.23);
+            roof.position.set(0, WALL_H, 0);
+            g.add(roof);
+        }
+
+        // --- Chimney ---
+        if (Math.random() < 0.9) {
+            const chim = makeVillageProp(Math.random() < 0.5 ? 'Prop_Chimney' : 'Prop_Chimney2', 1.0);
+            if (chim) {
+                chim.position.set((Math.random() - 0.5) * (W - 1.5), WALL_H + 0.5, (Math.random() - 0.5) * (D - 1.5));
+                g.add(chim);
+            }
+        }
+
+        // --- Occasional vine on a random wall ---
+        if (Math.random() < 0.5) {
+            const vineName = ['Prop_Vine1','Prop_Vine2','Prop_Vine4'][Math.floor(Math.random() * 3)];
+            const v = makeVillageProp(vineName, 1.0);
+            if (v) {
+                const side = Math.floor(Math.random() * 4);
+                const positions = [
+                    { x: rand(-W/4, W/4), z:  D/2 + 0.1, r: 0 },
+                    { x: rand(-W/4, W/4), z: -D/2 - 0.1, r: Math.PI },
+                    { x: -W/2 - 0.1, z: rand(-D/4, D/4), r: -Math.PI/2 },
+                    { x:  W/2 + 0.1, z: rand(-D/4, D/4), r: Math.PI/2 },
+                ];
+                v.position.set(positions[side].x, 0, positions[side].z);
+                v.rotation.y = positions[side].r;
+                g.add(v);
+            }
+        }
+
+        g.position.set(x, sampleGroundY(x, z), z);
+        g.rotation.y = rotY || 0;
+        return g;
     }
 
     // Add MegaKit props scattered around a village center
@@ -4003,6 +4173,61 @@
             orn.position.set(mx, sampleGroundY(mx, mz), mz);
             orn.rotation.y = rand(0, Math.PI * 2);
             propRoot.add(orn);
+        }
+
+        // --- Kit-built cottages scattered at village edge (decorative) ---
+        // Place 3-5 MegaKit houses outside the procedural house ring
+        const kitHouseCount = 3 + Math.floor(Math.random() * 3);
+        const placedKit = [];
+        for (let i = 0; i < kitHouseCount; i++) {
+            // Try several positions to avoid overlapping other kit houses
+            let hx, hz, ok = false;
+            for (let tries = 0; tries < 30 && !ok; tries++) {
+                const ang = rand(0, Math.PI * 2);
+                const r = rand(30, 55);
+                hx = cx + Math.cos(ang) * r;
+                hz = cz + Math.sin(ang) * r;
+                ok = true;
+                for (const p of placedKit) {
+                    if (Math.hypot(hx - p.x, hz - p.z) < 10) { ok = false; break; }
+                }
+            }
+            if (!ok) continue;
+
+            // Random house size (width x depth cells, each 2m)
+            const wCells = 2 + Math.floor(Math.random() * 2);  // 2 or 3 (4m or 6m wide)
+            const dCells = 2 + Math.floor(Math.random() * 2);  // 2 or 3 (4m or 6m deep)
+            const style = Math.random() < 0.5 ? 'brick' : 'plaster';
+            const rotY = Math.random() * Math.PI * 2;
+            const house = buildKitHouse(hx, hz, rotY, wCells, dCells, style);
+            if (house) {
+                propRoot.add(house);
+                placedKit.push({ x: hx, z: hz });
+            }
+        }
+
+        // --- Chimneys on existing procedural houses ---
+        // Find houses in houseColliders that are within this village and add chimneys on top
+        if (typeof houseColliders !== 'undefined') {
+            for (const h of houseColliders) {
+                if (!h.w) continue;
+                if (Math.hypot(h.x - cx, h.z - cz) > 55) continue;  // not in this village
+                if (Math.random() < 0.7) {
+                    const chim = makeVillageProp(Math.random() < 0.5 ? 'Prop_Chimney' : 'Prop_Chimney2', 1.0);
+                    if (chim) {
+                        // Place on top of the house at a random corner-ish spot
+                        const offX = (Math.random() - 0.5) * h.w * 0.6;
+                        const offZ = (Math.random() - 0.5) * h.d * 0.6;
+                        chim.position.set(
+                            h.x + Math.cos(h.rot) * offX - Math.sin(h.rot) * offZ,
+                            sampleGroundY(h.x, h.z) + 5.5,  // above roof
+                            h.z + Math.sin(h.rot) * offX + Math.cos(h.rot) * offZ
+                        );
+                        chim.rotation.y = h.rot;
+                        propRoot.add(chim);
+                    }
+                }
+            }
         }
     }
 
