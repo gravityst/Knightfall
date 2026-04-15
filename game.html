@@ -1698,6 +1698,8 @@
             x, z, rot: rotY,
             w, d, wallT, doorW, doorH, anchorY,
             doorPivot, doorOpen: false, doorAng: 0,
+            exteriorGroup: g,   // reference so we can swap it with a kit house later
+            isProcedural: true,
         });
     }
 
@@ -4268,35 +4270,66 @@
             propRoot.add(orn);
         }
 
-        // --- Kit-built cottages scattered at village edge (decorative) ---
-        // Place 4-6 MegaKit houses outside the procedural house ring.
-        // Avoid overlap with procedural houses too.
-        const kitHouseCount = 4 + Math.floor(Math.random() * 3);
+        // ================================================
+        // REPLACE PROCEDURAL HOUSES with MegaKit houses
+        // ================================================
+        if (typeof houseColliders !== 'undefined') {
+            for (const h of houseColliders) {
+                if (!h.isProcedural || !h.exteriorGroup) continue;
+                if (Math.hypot(h.x - cx, h.z - cz) > 60) continue;
+
+                // Snap procedural house footprint to 2m grid
+                const wCells = Math.max(2, Math.round(h.w / 2));
+                const dCells = Math.max(2, Math.round(h.d / 2));
+                const style = Math.random() < 0.55 ? 'plaster' : 'brick';
+
+                // Remove the procedural house (keep the door pivot logic cleanup minimal)
+                propRoot.remove(h.exteriorGroup);
+                // Dispose geometries to free memory
+                h.exteriorGroup.traverse(c => {
+                    if (c.isMesh && c.geometry && c.geometry.dispose) c.geometry.dispose();
+                });
+
+                // Build a kit house at the same place with matching rotation
+                const kit = buildKitHouse(h.x, h.z, h.rot, wCells, dCells, style);
+                if (kit) {
+                    propRoot.add(kit);
+                    h.exteriorGroup = kit;
+                    h.isProcedural = false;
+                    // Update collider footprint to match kit grid
+                    h.w = wCells * 2;
+                    h.d = dCells * 2;
+                }
+            }
+        }
+
+        // ================================================
+        // EXTRA kit cottages at outer ring for a richer village
+        // ================================================
+        const kitHouseCount = 3 + Math.floor(Math.random() * 3);
         const placedKit = [];
         for (let i = 0; i < kitHouseCount; i++) {
             let hx, hz, ok = false;
             for (let tries = 0; tries < 50 && !ok; tries++) {
                 const ang = rand(0, Math.PI * 2);
-                const r = rand(35, 60);   // push further out
+                const r = rand(40, 65);
                 hx = cx + Math.cos(ang) * r;
                 hz = cz + Math.sin(ang) * r;
                 ok = true;
                 for (const p of placedKit) {
                     if (Math.hypot(hx - p.x, hz - p.z) < 14) { ok = false; break; }
                 }
-                // Avoid overlapping procedural houses
                 if (ok && typeof houseColliders !== 'undefined') {
                     for (const h of houseColliders) {
                         if (!h.w) continue;
-                        if (Math.hypot(h.x - hx, h.z - hz) < 12) { ok = false; break; }
+                        if (Math.hypot(h.x - hx, h.z - hz) < 14) { ok = false; break; }
                     }
                 }
             }
             if (!ok) continue;
 
-            // Random house size (width x depth cells, each 2m)
-            const wCells = 3 + Math.floor(Math.random() * 2);  // 3 or 4 (6m or 8m wide)
-            const dCells = 2 + Math.floor(Math.random() * 3);  // 2-4 (4m, 6m, or 8m deep)
+            const wCells = 3 + Math.floor(Math.random() * 2);
+            const dCells = 2 + Math.floor(Math.random() * 3);
             const style = Math.random() < 0.5 ? 'brick' : 'plaster';
             const rotY = Math.random() * Math.PI * 2;
             const house = buildKitHouse(hx, hz, rotY, wCells, dCells, style);
@@ -4306,26 +4339,54 @@
             }
         }
 
-        // --- Chimneys on existing procedural houses ---
-        // Find houses in houseColliders that are within this village and add chimneys on top
-        if (typeof houseColliders !== 'undefined') {
-            for (const h of houseColliders) {
-                if (!h.w) continue;
-                if (Math.hypot(h.x - cx, h.z - cz) > 55) continue;  // not in this village
-                if (Math.random() < 0.7) {
-                    const chim = makeVillageProp(Math.random() < 0.5 ? 'Prop_Chimney' : 'Prop_Chimney2', 1.0);
-                    if (chim) {
-                        // Place on top of the house at a random corner-ish spot
-                        const offX = (Math.random() - 0.5) * h.w * 0.6;
-                        const offZ = (Math.random() - 0.5) * h.d * 0.6;
-                        chim.position.set(
-                            h.x + Math.cos(h.rot) * offX - Math.sin(h.rot) * offZ,
-                            sampleGroundY(h.x, h.z) + 5.5,  // above roof
-                            h.z + Math.sin(h.rot) * offX + Math.cos(h.rot) * offZ
-                        );
-                        chim.rotation.y = h.rot;
-                        propRoot.add(chim);
-                    }
+        // ================================================
+        // Rich village dressing: firewood piles, barrels, vines, supports,
+        // extra crates and market stalls
+        // ================================================
+
+        // Firewood piles: stacked brick piles (stand-ins for logs)
+        for (let i = 0; i < 4 + Math.floor(Math.random() * 3); i++) {
+            const ang = rand(0, Math.PI * 2);
+            const r = rand(10, 35);
+            const wx = cx + Math.cos(ang) * r;
+            const wz = cz + Math.sin(ang) * r;
+            const bricks = makeVillageProp(Math.random() < 0.5 ? 'Prop_Brick1' : 'Prop_Brick2', 1.0);
+            if (!bricks) continue;
+            bricks.position.set(wx, sampleGroundY(wx, wz), wz);
+            bricks.rotation.y = rand(0, Math.PI * 2);
+            propRoot.add(bricks);
+            // Stack a second pile slightly offset
+            if (Math.random() < 0.5) {
+                const b2 = makeVillageProp(Math.random() < 0.5 ? 'Prop_Brick1' : 'Prop_Brick2', 1.0);
+                if (b2) {
+                    b2.position.set(wx + rand(-1.2, 1.2), sampleGroundY(wx, wz), wz + rand(-1.2, 1.2));
+                    b2.rotation.y = rand(0, Math.PI * 2);
+                    propRoot.add(b2);
+                }
+            }
+        }
+
+        // Wooden support posts (like signs / market tent poles)
+        for (let i = 0; i < 3 + Math.floor(Math.random() * 3); i++) {
+            const ang = rand(0, Math.PI * 2);
+            const r = rand(8, 30);
+            const sx = cx + Math.cos(ang) * r;
+            const sz = cz + Math.sin(ang) * r;
+            const s = makeVillageProp('Prop_Support', 1.2);
+            if (!s) continue;
+            s.position.set(sx, sampleGroundY(sx, sz), sz);
+            s.rotation.y = rand(0, Math.PI * 2);
+            propRoot.add(s);
+        }
+
+        // Vines on random walls of kit houses
+        for (const p of placedKit) {
+            if (Math.random() < 0.55) {
+                const v = makeVillageProp(['Prop_Vine1','Prop_Vine2','Prop_Vine4'][Math.floor(Math.random() * 3)], 1.0);
+                if (v) {
+                    v.position.set(p.x + rand(-2.5, 2.5), sampleGroundY(p.x, p.z), p.z + rand(-2.5, 2.5));
+                    v.rotation.y = rand(0, Math.PI * 2);
+                    propRoot.add(v);
                 }
             }
         }
