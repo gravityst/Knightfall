@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Knightfall - The Long Night</title>
+    <title>Knightfall</title>
     <style>
         body { margin:0; overflow:hidden; background:#05050f; font-family:'IM Fell English SC',Georgia,serif; }
         canvas { display:block; }
@@ -4454,28 +4454,28 @@
     // herd: animals with same spec group cohesion toward centroid.
     // pack: predators hunt together.
     const SPEC_FOX = {
-        model: 'Fox',  scale: 0.7,
+        model: 'Fox',  scale: 0.42,
         idleAnim: 'Idle', walkAnim: 'Walk', runAnim: 'Gallop',
         eatAnim: 'Eating', deathAnim: 'Death',
         speedWalk: 2.8, speedFlee: 14, fleeR: 14,
         social: 0.0,   // solitary
     };
     const SPEC_DEER = {
-        model: 'Deer', scale: 1.0,
+        model: 'Deer', scale: 0.6,
         idleAnim: 'Idle', walkAnim: 'Walk', runAnim: 'Gallop',
         eatAnim: 'Eating', deathAnim: 'Death',
         speedWalk: 3.5, speedFlee: 14, fleeR: 26,
         social: 0.35, // light herd (families)
     };
     const SPEC_STAG = {
-        model: 'Stag', scale: 1.2,
+        model: 'Stag', scale: 0.72,
         idleAnim: 'Idle', walkAnim: 'Walk', runAnim: 'Gallop',
         eatAnim: 'Eating', deathAnim: 'Death',
         speedWalk: 3.2, speedFlee: 15, fleeR: 30,
         social: 0.0,   // stags are loners
     };
     const SPEC_WOLF = {
-        model: 'Wolf', scale: 0.85,
+        model: 'Wolf', scale: 0.5,
         idleAnim: 'Idle', walkAnim: 'Walk', runAnim: 'Gallop',
         attackAnim: 'Attack', deathAnim: 'Death',
         speedWalk: 3.0, speedChase: 9.0, chaseR: 22,
@@ -4483,56 +4483,56 @@
         pack: true,
     };
     const SPEC_COW = {
-        model: 'Cow', scale: 1.05,
+        model: 'Cow', scale: 0.68,
         idleAnim: 'Idle', walkAnim: 'Walk', runAnim: 'Gallop',
         eatAnim: 'Eating', deathAnim: 'Death',
         speedWalk: 1.8, speedFlee: 8, fleeR: 10,
         social: 0.75,  // strong herd cohesion
     };
     const SPEC_HORSE = {
-        model: 'Horse', scale: 1.25,
+        model: 'Horse', scale: 0.8,
         idleAnim: 'Idle', walkAnim: 'Walk', runAnim: 'Gallop',
         eatAnim: 'Eating', deathAnim: 'Death',
         speedWalk: 3.0, speedFlee: 14, fleeR: 14,
         social: 0.6,
     };
     const SPEC_HORSE_WHITE = {
-        model: 'Horse_White', scale: 1.25,
+        model: 'Horse_White', scale: 0.8,
         idleAnim: 'Idle', walkAnim: 'Walk', runAnim: 'Gallop',
         eatAnim: 'Eating', deathAnim: 'Death',
         speedWalk: 3.0, speedFlee: 14, fleeR: 14,
         social: 0.6,
     };
     const SPEC_ALPACA = {
-        model: 'Alpaca', scale: 0.85,
+        model: 'Alpaca', scale: 0.55,
         idleAnim: 'Idle', walkAnim: 'Walk', runAnim: 'Gallop',
         eatAnim: 'Eating', deathAnim: 'Death',
         speedWalk: 2.0, speedFlee: 9, fleeR: 12,
         social: 0.55,
     };
     const SPEC_BULL = {
-        model: 'Bull', scale: 1.15,
+        model: 'Bull', scale: 0.75,
         idleAnim: 'Idle', walkAnim: 'Walk', runAnim: 'Gallop',
         attackAnim: 'Attack_Headbutt', deathAnim: 'Death',
         speedWalk: 2.2, speedChase: 10, chaseR: 18,
         social: 0.0,
     };
     const SPEC_DONKEY = {
-        model: 'Donkey', scale: 1.0,
+        model: 'Donkey', scale: 0.6,
         idleAnim: 'Idle', walkAnim: 'Walk', runAnim: 'Gallop',
         eatAnim: 'Eating', deathAnim: 'Death',
         speedWalk: 1.6, speedFlee: 6, fleeR: 10,
         social: 0.4,
     };
     const SPEC_HUSKY = {
-        model: 'Husky', scale: 0.7,
+        model: 'Husky', scale: 0.42,
         idleAnim: 'Idle', walkAnim: 'Walk', runAnim: 'Gallop',
         eatAnim: 'Eating', deathAnim: 'Death',
         speedWalk: 2.4, speedFlee: 10, fleeR: 8,
         social: 0.5,
     };
     const SPEC_SHIBA = {
-        model: 'ShibaInu', scale: 0.55,
+        model: 'ShibaInu', scale: 0.32,
         idleAnim: 'Idle', walkAnim: 'Walk', runAnim: 'Gallop',
         eatAnim: 'Eating', deathAnim: 'Death',
         speedWalk: 2.4, speedFlee: 10, fleeR: 8,

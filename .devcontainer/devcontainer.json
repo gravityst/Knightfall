@@ -1,0 +1,6 @@
+{
+  "name": "Knightfall Codespace",
+  "extensions": [
+    "anthropic.claude-code"
+  ]
+}
