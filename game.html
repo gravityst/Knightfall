@@ -3994,6 +3994,7 @@
     //  MEDIEVAL VILLAGE MEGAKIT — Quaternius kitbash props
     // ===================================================================
     const villageProps = {};
+    let kitReady = false;
 
     async function loadVillageProps() {
         const names = [
@@ -4017,7 +4018,8 @@
                 villageProps[name] = gltf.scene;
             } catch(e) { console.warn('Failed to load village prop:', name, e); }
         }));
-        console.log('Village props loaded:', Object.keys(villageProps).length);
+        kitReady = Object.keys(villageProps).length > 0;
+        console.log('Village props loaded:', Object.keys(villageProps).length, 'kitReady:', kitReady);
     }
 
     // Low-poly material override: strip PBR textures, use flat colored Lambert
@@ -4196,8 +4198,17 @@
             }
         }
 
+        // Place on ground — caller may override position.y for flattened terrain
         g.position.set(x, sampleGroundY(x, z), z);
         g.rotation.y = rotY || 0;
+
+        // Add a stone plinth underneath (extends below to hide terrain gaps)
+        const plinthMat = new THREE.MeshLambertMaterial({ color: 0x6a655a, flatShading: true });
+        const plinth = new THREE.Mesh(new THREE.BoxGeometry(W + 0.5, 2.5, D + 0.5), plinthMat);
+        plinth.position.set(0, -1.25, 0);
+        plinth.receiveShadow = true;
+        g.add(plinth);
+
         return g;
     }
 
@@ -4268,39 +4279,6 @@
             orn.position.set(mx, sampleGroundY(mx, mz), mz);
             orn.rotation.y = rand(0, Math.PI * 2);
             propRoot.add(orn);
-        }
-
-        // ================================================
-        // REPLACE PROCEDURAL HOUSES with MegaKit houses
-        // ================================================
-        if (typeof houseColliders !== 'undefined') {
-            for (const h of houseColliders) {
-                if (!h.isProcedural || !h.exteriorGroup) continue;
-                if (Math.hypot(h.x - cx, h.z - cz) > 60) continue;
-
-                // Snap procedural house footprint to 2m grid
-                const wCells = Math.max(2, Math.round(h.w / 2));
-                const dCells = Math.max(2, Math.round(h.d / 2));
-                const style = Math.random() < 0.55 ? 'plaster' : 'brick';
-
-                // Remove the procedural house (keep the door pivot logic cleanup minimal)
-                propRoot.remove(h.exteriorGroup);
-                // Dispose geometries to free memory
-                h.exteriorGroup.traverse(c => {
-                    if (c.isMesh && c.geometry && c.geometry.dispose) c.geometry.dispose();
-                });
-
-                // Build a kit house at the same place with matching rotation
-                const kit = buildKitHouse(h.x, h.z, h.rot, wCells, dCells, style);
-                if (kit) {
-                    propRoot.add(kit);
-                    h.exteriorGroup = kit;
-                    h.isProcedural = false;
-                    // Update collider footprint to match kit grid
-                    h.w = wCells * 2;
-                    h.d = dCells * 2;
-                }
-            }
         }
 
         // ================================================
@@ -4392,13 +4370,56 @@
         }
     }
 
-    // Start loading village props in background
+    // Start loading village props; once loaded, REBUILD villages with kit houses
     loadVillageProps().then(() => {
-        // Decorate all villages that were built earlier
+        // Replace every procedural house with a kit house
+        if (typeof houseColliders !== 'undefined') {
+            let replaced = 0;
+            for (const h of houseColliders) {
+                if (!h.isProcedural || !h.exteriorGroup) continue;
+                
+                // Grid-snap footprint to 2m cells
+                const wCells = Math.max(3, Math.round(h.w / 2));
+                const dCells = Math.max(2, Math.round(h.d / 2));
+                const style = Math.random() < 0.55 ? 'plaster' : 'brick';
+
+                // Remove procedural house
+                propRoot.remove(h.exteriorGroup);
+                h.exteriorGroup.traverse(c => {
+                    if (c.isMesh && c.geometry) c.geometry.dispose();
+                });
+
+                // Build kit house — flatten terrain underneath
+                const W = wCells * 2, D = dCells * 2;
+                flattenAt(h.x, h.z, Math.max(W, D) * 1.2, h.anchorY || sampleGroundY(h.x, h.z));
+                _terrainEdited = true;
+
+                const kit = buildKitHouse(h.x, h.z, h.rot, wCells, dCells, style);
+                if (kit) {
+                    kit.position.y = h.anchorY || sampleGroundY(h.x, h.z);
+                    propRoot.add(kit);
+                    h.exteriorGroup = kit;
+                    h.isProcedural = false;
+                    h.w = W;
+                    h.d = D;
+                    replaced++;
+                }
+            }
+            console.log('Replaced', replaced, 'procedural houses with kit houses');
+        }
+
+        // Re-snap terrain after all edits
+        if (_terrainEdited) {
+            groundGeo.attributes.position.needsUpdate = true;
+            groundGeo.attributes.color.needsUpdate = true;
+            groundGeo.computeVertexNormals();
+        }
+
+        // Now decorate each village with props
         if (typeof villageCenters !== 'undefined') {
             for (const v of villageCenters) decorateVillage(v.cx, v.cz);
         }
-        console.log('Villages decorated with MegaKit props');
+        console.log('Villages rebuilt with MegaKit');
     }).catch(e => console.warn('Village props failed:', e));
 
     // Build a cloned animal with its own AnimationMixer
